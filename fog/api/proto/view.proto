@@ -268,4 +268,8 @@ message TxOutRecord {
     bytes tx_out_e_memo_data = 9;
     /// The masked token id associated to the amount field in the TxOut that was recovered
     bytes tx_out_amount_masked_token_id = 10;
+    /// The masked token id associated to the v2 amount field in the TxOut that was recovered
+    /// This field is mutually exclusive with `tx_out_amount_masked_token_id`. It's presence indicates that
+    /// a MaskedAmountV2 object was serialized, rather than a V1 object.
+    bytes tx_out_amount_v2_masked_token_id = 11;
 }

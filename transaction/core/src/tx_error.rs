@@ -9,7 +9,7 @@ use displaydoc::Display;
 use mc_crypto_keys::KeyError;
 
 /// An error that occurs when creating a new TxOut
-#[derive(Debug, Display)]
+#[derive(Debug, Display, Clone)]
 pub enum NewTxError {
     /// Amount: {0}
     Amount(AmountError),
@@ -31,13 +31,22 @@ impl From<NewMemoError> for NewTxError {
     }
 }
 
+/// An error that occurs when handling a TxOut
+#[derive(Debug, Display, Clone)]
+pub enum TxOutConversionError {
+    /// Unknown Masked Amount Version
+    UnknownMaskedAmountVersion,
+}
+
 /// An error that occurs when view key matching a TxOut
-#[derive(Debug, Display)]
+#[derive(Debug, Display, Clone)]
 pub enum ViewKeyMatchError {
     /// Key: {0}
     Key(KeyError),
     /// Amount: {0}
     Amount(AmountError),
+    /// Unknown Masked Amount Version
+    UnknownMaskedAmountVersion,
 }
 
 impl From<KeyError> for ViewKeyMatchError {
@@ -58,7 +67,7 @@ impl From<AmountError> for ViewKeyMatchError {
 /// We have included error codes for some known useful error conditions.
 /// For a custom MemoBuilder, you can try to reuse those, or use the Other
 /// error code.
-#[derive(Debug, Display, Eq, PartialEq)]
+#[derive(Debug, Display, Eq, PartialEq, Clone)]
 pub enum NewMemoError {
     /// Limits for '{0}' value exceeded
     LimitsExceeded(&'static str),

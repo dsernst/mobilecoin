@@ -174,11 +174,9 @@ impl TryFrom<&mc_mobilecoind_api::TxProposal> for TxProposal {
 #[cfg(test)]
 mod test {
     use super::*;
-    use mc_crypto_keys::RistrettoPublic;
+    use mc_crypto_keys::RistrettoPrivate;
     use mc_ledger_db::Ledger;
-    use mc_transaction_core::{
-        encrypted_fog_hint::ENCRYPTED_FOG_HINT_LEN, tokens::Mob, Amount, MaskedAmount, Token,
-    };
+    use mc_transaction_core::{tokens::Mob, Amount, PublicAddress, Token};
     use mc_transaction_core_test_utils::{
         create_ledger, create_transaction, initialize_ledger, AccountKey, BlockVersion,
     };
@@ -195,14 +193,14 @@ mod test {
             value: 1u64 << 13,
             token_id: Mob::ID,
         };
-        let tx_out = TxOut {
-            masked_amount: MaskedAmount::new(amount, &RistrettoPublic::from_random(&mut rng))
-                .unwrap(),
-            target_key: RistrettoPublic::from_random(&mut rng).into(),
-            public_key: RistrettoPublic::from_random(&mut rng).into(),
-            e_fog_hint: (&[0u8; ENCRYPTED_FOG_HINT_LEN]).into(),
-            e_memo: Some(Default::default()),
-        };
+        let tx_out = TxOut::new(
+            BlockVersion::MAX,
+            amount,
+            &PublicAddress::from_random(&mut rng),
+            &RistrettoPrivate::from_random(&mut rng),
+            Default::default(),
+        )
+        .unwrap();
 
         let subaddress_index = 123;
         let key_image = KeyImage::from(456);
@@ -287,14 +285,14 @@ mod test {
                 value: 1u64 << 13,
                 token_id: Mob::ID,
             };
-            let tx_out = TxOut {
-                masked_amount: MaskedAmount::new(amount, &RistrettoPublic::from_random(&mut rng))
-                    .unwrap(),
-                target_key: RistrettoPublic::from_random(&mut rng).into(),
-                public_key: RistrettoPublic::from_random(&mut rng).into(),
-                e_fog_hint: (&[0u8; ENCRYPTED_FOG_HINT_LEN]).into(),
-                e_memo: Some(Default::default()),
-            };
+            let tx_out = TxOut::new(
+                BlockVersion::MAX,
+                amount,
+                &PublicAddress::from_random(&mut rng),
+                &RistrettoPrivate::from_random(&mut rng),
+                Default::default(),
+            )
+            .unwrap();
 
             let subaddress_index = 123;
             let key_image = KeyImage::from(456);

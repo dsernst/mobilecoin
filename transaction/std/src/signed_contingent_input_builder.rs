@@ -248,9 +248,10 @@ impl<FPR: FogPubkeyResolver> SignedContingentInputBuilder<FPR> {
         )?;
 
         let (amount, blinding) = tx_out
-            .masked_amount
+            .get_masked_amount()
+            .expect("SignedContingentInputBuilder created an invalid VersionedMaskedAmount")
             .get_value(&shared_secret)
-            .expect("TransactionBuilder created an invalid Amount");
+            .expect("SignedContingentInputBuilder created an invalid Amount");
         let output_secret = OutputSecret { amount, blinding };
 
         self.impose_tombstone_block_limit(pubkey_expiry);
@@ -333,7 +334,7 @@ impl<FPR: FogPubkeyResolver> SignedContingentInputBuilder<FPR> {
         // Clear the merkle proofs, because this makes the SCI smaller,
         // and the recipient needs to regenerate them later most likely anyways.
         tx_in.proofs.clear();
-        let ring = SignableInputRing::from(self.input_credentials);
+        let ring = SignableInputRing::try_from(self.input_credentials)?;
 
         let pseudo_output_blinding = Scalar::random(rng);
 
@@ -786,7 +787,11 @@ pub mod tests {
                     bob.view_private_key(),
                     &RistrettoPublic::try_from(&bob_output.public_key).unwrap(),
                 );
-                let (amount, _) = bob_output.masked_amount.get_value(&ss).unwrap();
+                let (amount, _) = bob_output
+                    .get_masked_amount()
+                    .unwrap()
+                    .get_value(&ss)
+                    .unwrap();
                 assert_eq!(amount, Amount::new(value - Mob::MINIMUM_FEE, Mob::ID));
 
                 let memo = bob_output.e_memo.unwrap().decrypt(&ss);
@@ -803,7 +808,11 @@ pub mod tests {
                     bob.view_private_key(),
                     &RistrettoPublic::try_from(&bob_change.public_key).unwrap(),
                 );
-                let (amount, _) = bob_change.masked_amount.get_value(&ss).unwrap();
+                let (amount, _) = bob_change
+                    .get_masked_amount()
+                    .unwrap()
+                    .get_value(&ss)
+                    .unwrap();
                 assert_eq!(amount, Amount::new(200_000, token2));
 
                 let memo = bob_change.e_memo.unwrap().decrypt(&ss);
@@ -820,7 +829,11 @@ pub mod tests {
                     alice.view_private_key(),
                     &RistrettoPublic::try_from(&alice_output.public_key).unwrap(),
                 );
-                let (amount, _) = alice_output.masked_amount.get_value(&ss).unwrap();
+                let (amount, _) = alice_output
+                    .get_masked_amount()
+                    .unwrap()
+                    .get_value(&ss)
+                    .unwrap();
                 assert_eq!(amount, amount2);
 
                 let memo = alice_output.e_memo.unwrap().decrypt(&ss);
@@ -1034,7 +1047,11 @@ pub mod tests {
                     bob.view_private_key(),
                     &RistrettoPublic::try_from(&bob_output.public_key).unwrap(),
                 );
-                let (amount, _) = bob_output.masked_amount.get_value(&ss).unwrap();
+                let (amount, _) = bob_output
+                    .get_masked_amount()
+                    .unwrap()
+                    .get_value(&ss)
+                    .unwrap();
                 assert_eq!(amount, Amount::new(value - Mob::MINIMUM_FEE, Mob::ID));
 
                 let memo = bob_output.e_memo.unwrap().decrypt(&ss);
@@ -1051,7 +1068,11 @@ pub mod tests {
                     bob.view_private_key(),
                     &RistrettoPublic::try_from(&bob_change.public_key).unwrap(),
                 );
-                let (amount, _) = bob_change.masked_amount.get_value(&ss).unwrap();
+                let (amount, _) = bob_change
+                    .get_masked_amount()
+                    .unwrap()
+                    .get_value(&ss)
+                    .unwrap();
                 assert_eq!(amount, Amount::new(200_000, token2));
 
                 let memo = bob_change.e_memo.unwrap().decrypt(&ss);
@@ -1068,7 +1089,11 @@ pub mod tests {
                     alice.view_private_key(),
                     &RistrettoPublic::try_from(&alice_output.public_key).unwrap(),
                 );
-                let (amount, _) = alice_output.masked_amount.get_value(&ss).unwrap();
+                let (amount, _) = alice_output
+                    .get_masked_amount()
+                    .unwrap()
+                    .get_value(&ss)
+                    .unwrap();
                 assert_eq!(amount, amount2);
 
                 let memo = alice_output.e_memo.unwrap().decrypt(&ss);
@@ -1318,7 +1343,11 @@ pub mod tests {
                     bob.view_private_key(),
                     &RistrettoPublic::try_from(&bob_output.public_key).unwrap(),
                 );
-                let (amount, _) = bob_output.masked_amount.get_value(&ss).unwrap();
+                let (amount, _) = bob_output
+                    .get_masked_amount()
+                    .unwrap()
+                    .get_value(&ss)
+                    .unwrap();
                 assert_eq!(amount, Amount::new(666, token3));
 
                 let memo = bob_output.e_memo.unwrap().decrypt(&ss);
@@ -1335,7 +1364,11 @@ pub mod tests {
                     bob.view_private_key(),
                     &RistrettoPublic::try_from(&bob_change.public_key).unwrap(),
                 );
-                let (amount, _) = bob_change.masked_amount.get_value(&ss).unwrap();
+                let (amount, _) = bob_change
+                    .get_masked_amount()
+                    .unwrap()
+                    .get_value(&ss)
+                    .unwrap();
                 assert_eq!(amount, Amount::new(200_000, token2));
 
                 let memo = bob_change.e_memo.unwrap().decrypt(&ss);
@@ -1352,7 +1385,11 @@ pub mod tests {
                     charlie.view_private_key(),
                     &RistrettoPublic::try_from(&charlie_output.public_key).unwrap(),
                 );
-                let (amount, _) = charlie_output.masked_amount.get_value(&ss).unwrap();
+                let (amount, _) = charlie_output
+                    .get_masked_amount()
+                    .unwrap()
+                    .get_value(&ss)
+                    .unwrap();
                 assert_eq!(amount, Amount::new(value - Mob::MINIMUM_FEE, Mob::ID));
 
                 let memo = charlie_output.e_memo.unwrap().decrypt(&ss);
@@ -1369,7 +1406,11 @@ pub mod tests {
                     charlie.view_private_key(),
                     &RistrettoPublic::try_from(&charlie_change.public_key).unwrap(),
                 );
-                let (amount, _) = charlie_change.masked_amount.get_value(&ss).unwrap();
+                let (amount, _) = charlie_change
+                    .get_masked_amount()
+                    .unwrap()
+                    .get_value(&ss)
+                    .unwrap();
                 assert_eq!(amount, Amount::new(333, token3));
 
                 let memo = charlie_change.e_memo.unwrap().decrypt(&ss);
@@ -1386,7 +1427,11 @@ pub mod tests {
                     alice.view_private_key(),
                     &RistrettoPublic::try_from(&alice_output.public_key).unwrap(),
                 );
-                let (amount, _) = alice_output.masked_amount.get_value(&ss).unwrap();
+                let (amount, _) = alice_output
+                    .get_masked_amount()
+                    .unwrap()
+                    .get_value(&ss)
+                    .unwrap();
                 assert_eq!(amount, Amount::new(100_000, token2));
 
                 let memo = alice_output.e_memo.unwrap().decrypt(&ss);

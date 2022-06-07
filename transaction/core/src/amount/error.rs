@@ -1,9 +1,11 @@
+// Copyright (c) 2018-2022 The MobileCoin Foundation
+
 //! Errors that can occur when handling an amount commitment.
 
 use displaydoc::Display;
 
 /// An error which can occur when handling an amount commitment.
-#[derive(Debug, Display, Eq, PartialEq)]
+#[derive(Debug, Display, Eq, PartialEq, Clone)]
 pub enum AmountError {
     /**
      * The masked value, token id, or shared secret are not consistent with

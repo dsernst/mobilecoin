@@ -2,7 +2,7 @@
 
 use mc_attest_net::{Client as AttestClient, RaClient};
 use mc_common::logger::{log, o, Logger};
-use mc_crypto_keys::{CompressedRistrettoPublic, Ed25519Pair, RistrettoPublic};
+use mc_crypto_keys::{CompressedRistrettoPublic, Ed25519Pair, RistrettoPrivate};
 use mc_fog_ingest_server::{
     server::{IngestServer, IngestServerConfig},
     state_file::StateFile,
@@ -13,11 +13,10 @@ use mc_fog_test_infra::get_enclave_path;
 use mc_fog_uri::{ConnectionUri, FogIngestUri, IngestPeerUri};
 use mc_ledger_db::{Ledger, LedgerDB};
 use mc_transaction_core::{
-    encrypted_fog_hint::EncryptedFogHint,
     membership_proofs::Range,
     ring_signature::KeyImage,
     tx::{TxOut, TxOutMembershipElement, TxOutMembershipHash},
-    Block, BlockContents, BlockData, BlockSignature, BlockVersion, MaskedAmount,
+    Amount, Block, BlockContents, BlockData, BlockSignature, BlockVersion, PublicAddress, TokenId,
 };
 use mc_util_from_random::FromRandom;
 use mc_watcher::watcher_db::WatcherDB;
@@ -411,11 +410,12 @@ pub fn add_test_block<T: RngCore + CryptoRng>(
 
 /// Make a random output for a block
 pub fn random_output<T: RngCore + CryptoRng>(rng: &mut T) -> TxOut {
-    TxOut {
-        masked_amount: MaskedAmount::default(),
-        target_key: RistrettoPublic::from_random(rng).into(),
-        public_key: RistrettoPublic::from_random(rng).into(),
-        e_fog_hint: EncryptedFogHint::default(),
-        e_memo: None,
-    }
+    TxOut::new(
+        BlockVersion::ZERO,
+        Amount::new(rng.next_u64(), TokenId::from(0)),
+        &PublicAddress::from_random(rng),
+        &RistrettoPrivate::from_random(rng),
+        Default::default(),
+    )
+    .unwrap()
 }

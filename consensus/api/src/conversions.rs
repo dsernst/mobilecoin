@@ -67,6 +67,7 @@ impl From<Error> for ProposeTxResult {
             Error::InputRule(InputRuleError::MaxTombstoneBlockExceeded) => {
                 Self::InputRuleMaxTombstoneBlockExceeded
             }
+            Error::UnknownMaskedAmountVersion => Self::UnknownMaskedAmountVersion,
         }
     }
 }
@@ -123,6 +124,7 @@ impl TryInto<Error> for ProposeTxResult {
             Self::InputRuleMaxTombstoneBlockExceeded => {
                 Ok(Error::InputRule(InputRuleError::MaxTombstoneBlockExceeded))
             }
+            Self::UnknownMaskedAmountVersion => Ok(Error::UnknownMaskedAmountVersion),
         }
     }
 }

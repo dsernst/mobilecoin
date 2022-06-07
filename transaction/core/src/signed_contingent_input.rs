@@ -5,7 +5,7 @@
 use crate::{
     ring_ct::{OutputSecret, PresignedInputRing, SignedInputRing},
     tx::TxIn,
-    Amount, TokenId,
+    Amount, TokenId, TxOutConversionError,
 };
 use alloc::vec::Vec;
 use displaydoc::Display;
@@ -99,7 +99,7 @@ impl SignedContingentInput {
             .signed_digest()
             .ok_or(SignedContingentInputError::MissingRules)?;
 
-        let signed_input_ring = SignedInputRing::from(&self.tx_in);
+        let signed_input_ring = SignedInputRing::try_from(&self.tx_in)?;
 
         self.mlsag
             .verify(&rules_digest, &signed_input_ring.members, &pseudo_output)?;
@@ -121,7 +121,7 @@ impl SignedContingentInput {
                     amount.blinding.into(),
                     generator,
                 ));
-                if expected_commitment != output.masked_amount.commitment {
+                if &expected_commitment != output.get_masked_amount()?.get_commitment() {
                     return Err(SignedContingentInputError::RequiredOutputMismatch);
                 }
             }
@@ -183,10 +183,18 @@ pub enum SignedContingentInputError {
     MissingProofs,
     /// Invalid Ring signature: {0}
     RingSignature(RingSignatureError),
+    /// TxOut conversion: {0}
+    TxOutConversion(TxOutConversionError),
 }
 
 impl From<RingSignatureError> for SignedContingentInputError {
     fn from(src: RingSignatureError) -> Self {
         Self::RingSignature(src)
+    }
+}
+
+impl From<TxOutConversionError> for SignedContingentInputError {
+    fn from(src: TxOutConversionError) -> Self {
+        Self::TxOutConversion(src)
     }
 }

@@ -38,7 +38,7 @@ pub mod validation;
 #[cfg(test)]
 pub mod proptest_fixtures;
 
-pub use amount::{AmountError, MaskedAmount};
+pub use amount::{AmountError, MaskedAmount, MaskedAmountV2, VersionedMaskedAmount};
 pub use blockchain::*;
 pub use input_rules::{InputRuleError, InputRules};
 pub use memo::{EncryptedMemo, MemoError, MemoPayload};
@@ -47,7 +47,7 @@ pub use signed_contingent_input::{
 };
 pub use token::{tokens, Token};
 pub use tx::MemoContext;
-pub use tx_error::{NewMemoError, NewTxError, ViewKeyMatchError};
+pub use tx_error::{NewMemoError, NewTxError, TxOutConversionError, ViewKeyMatchError};
 pub use tx_out_gift_code::TxOutGiftCode;
 
 // Re-export Amount and TokenId from transaction-types, and certain types from
@@ -62,6 +62,9 @@ pub mod ring_signature {
 
 // Re-export the one-time keys module which historically lived in this crate
 pub use mc_crypto_ring_signature::onetime_keys;
+
+// Re-export some dependent types from mc-account-keys
+pub use mc_account_keys::PublicAddress;
 
 use core::convert::TryFrom;
 use mc_account_keys::AccountKey;

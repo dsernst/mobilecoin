@@ -4,15 +4,14 @@
 // by testing that they round-trip through the proto-generated rust types
 
 use core::convert::TryFrom;
-use mc_crypto_keys::RistrettoPublic;
+use mc_crypto_keys::RistrettoPrivate;
 use mc_fog_api::kex_rng;
 use mc_fog_kex_rng::{KexRngPubkey, StoredRng};
 use mc_fog_report_api_test_utils::{round_trip_message, round_trip_protobuf_object};
 use mc_transaction_core::{
-    encrypted_fog_hint::EncryptedFogHint,
     membership_proofs::Range,
     tx::{TxOut, TxOutMembershipElement, TxOutMembershipHash, TxOutMembershipProof},
-    Amount, EncryptedMemo, MaskedAmount,
+    Amount, BlockVersion, EncryptedMemo, PublicAddress,
 };
 use mc_util_from_random::FromRandom;
 use mc_util_test_helper::{run_with_several_seeds, CryptoRng, RngCore};
@@ -439,25 +438,20 @@ impl Sample for mc_fog_types::view::TxOutSearchResult {
     }
 }
 
-impl Sample for MaskedAmount {
+impl Sample for TxOut {
     fn sample<T: RngCore + CryptoRng>(rng: &mut T) -> Self {
         let amount = Amount {
             value: rng.next_u32() as u64,
             token_id: rng.next_u64().into(),
         };
-        MaskedAmount::new(amount, &RistrettoPublic::from_random(rng)).unwrap()
-    }
-}
-
-impl Sample for TxOut {
-    fn sample<T: RngCore + CryptoRng>(rng: &mut T) -> Self {
-        TxOut {
-            masked_amount: MaskedAmount::sample(rng),
-            target_key: RistrettoPublic::from_random(rng).into(),
-            public_key: RistrettoPublic::from_random(rng).into(),
-            e_fog_hint: EncryptedFogHint::fake_onetime_hint(rng),
-            e_memo: Option::<EncryptedMemo>::sample(rng),
-        }
+        TxOut::new(
+            BlockVersion::MAX,
+            amount,
+            &PublicAddress::from_random(rng),
+            &RistrettoPrivate::from_random(rng),
+            Default::default(),
+        )
+        .unwrap()
     }
 }
 

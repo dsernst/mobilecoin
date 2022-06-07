@@ -83,6 +83,9 @@ pub enum Error {
 
     /// DuplicateMintConfigTx
     DuplicateMintConfigTx,
+
+    /// Missing masked amonut
+    MissingMaskedAmount,
 }
 
 impl From<lmdb::Error> for Error {

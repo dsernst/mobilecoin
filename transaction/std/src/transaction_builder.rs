@@ -412,7 +412,8 @@ impl<FPR: FogPubkeyResolver> TransactionBuilder<FPR> {
             create_output_with_fog_hint(self.block_version, amount, recipient, hint, memo_fn, rng)?;
 
         let (amount, blinding) = tx_out
-            .masked_amount
+            .get_masked_amount()
+            .expect("TransactionBuilder created an invalid VersionedMaskedAmount")
             .get_value(&shared_secret)
             .expect("TransactionBuilder created an invalid Amount");
         let output_secret = OutputSecret { amount, blinding };
@@ -597,8 +598,8 @@ impl<FPR: FogPubkeyResolver> TransactionBuilder<FPR> {
         let input_rings = self
             .input_materials
             .into_iter()
-            .map(Into::into)
-            .collect::<Vec<InputRing>>();
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<InputRing>, _>>()?;
 
         let message = tx_prefix.hash().0;
         let signature = SignatureRctBulletproofs::sign(
@@ -1187,7 +1188,7 @@ pub mod transaction_builder_tests {
                         recipient.view_private_key(),
                         &RistrettoPublic::try_from(&output.public_key).unwrap(),
                     );
-                    let (amount, _) = output.masked_amount.get_value(&ss).unwrap();
+                    let (amount, _) = output.get_masked_amount().unwrap().get_value(&ss).unwrap();
                     assert_eq!(amount.value, value - change_value - Mob::MINIMUM_FEE);
                     assert_eq!(amount.token_id, token_id);
 
@@ -1218,7 +1219,7 @@ pub mod transaction_builder_tests {
                         sender.view_private_key(),
                         &RistrettoPublic::try_from(&change.public_key).unwrap(),
                     );
-                    let (amount, _) = change.masked_amount.get_value(&ss).unwrap();
+                    let (amount, _) = change.get_masked_amount().unwrap().get_value(&ss).unwrap();
                     assert_eq!(amount.value, change_value);
                     assert_eq!(amount.token_id, token_id);
 
@@ -1370,7 +1371,7 @@ pub mod transaction_builder_tests {
                         recipient.view_private_key(),
                         &RistrettoPublic::try_from(&output.public_key).unwrap(),
                     );
-                    let (amount, _) = output.masked_amount.get_value(&ss).unwrap();
+                    let (amount, _) = output.get_masked_amount().unwrap().get_value(&ss).unwrap();
                     assert_eq!(amount.value, value - change_value - Mob::MINIMUM_FEE);
                     assert_eq!(amount.token_id, token_id);
 
@@ -1409,7 +1410,7 @@ pub mod transaction_builder_tests {
                         sender.view_private_key(),
                         &RistrettoPublic::try_from(&change.public_key).unwrap(),
                     );
-                    let (amount, _) = change.masked_amount.get_value(&ss).unwrap();
+                    let (amount, _) = change.get_masked_amount().unwrap().get_value(&ss).unwrap();
                     assert_eq!(amount.value, change_value);
                     assert_eq!(amount.token_id, token_id);
 
@@ -1534,7 +1535,7 @@ pub mod transaction_builder_tests {
                         recipient.view_private_key(),
                         &RistrettoPublic::try_from(&output.public_key).unwrap(),
                     );
-                    let (amount, _) = output.masked_amount.get_value(&ss).unwrap();
+                    let (amount, _) = output.get_masked_amount().unwrap().get_value(&ss).unwrap();
                     assert_eq!(amount.value, value - change_value - Mob::MINIMUM_FEE * 4);
                     assert_eq!(amount.token_id, token_id);
 
@@ -1573,7 +1574,7 @@ pub mod transaction_builder_tests {
                         sender.view_private_key(),
                         &RistrettoPublic::try_from(&change.public_key).unwrap(),
                     );
-                    let (amount, _) = change.masked_amount.get_value(&ss).unwrap();
+                    let (amount, _) = change.get_masked_amount().unwrap().get_value(&ss).unwrap();
                     assert_eq!(amount.value, change_value);
                     assert_eq!(amount.token_id, token_id);
 
@@ -1698,7 +1699,7 @@ pub mod transaction_builder_tests {
                         recipient.view_private_key(),
                         &RistrettoPublic::try_from(&output.public_key).unwrap(),
                     );
-                    let (amount, _) = output.masked_amount.get_value(&ss).unwrap();
+                    let (amount, _) = output.get_masked_amount().unwrap().get_value(&ss).unwrap();
                     assert_eq!(amount.value, value - change_value - Mob::MINIMUM_FEE);
                     assert_eq!(amount.token_id, token_id);
 
@@ -1738,7 +1739,7 @@ pub mod transaction_builder_tests {
                         sender.view_private_key(),
                         &RistrettoPublic::try_from(&change.public_key).unwrap(),
                     );
-                    let (amount, _) = change.masked_amount.get_value(&ss).unwrap();
+                    let (amount, _) = change.get_masked_amount().unwrap().get_value(&ss).unwrap();
                     assert_eq!(amount.value, change_value);
                     assert_eq!(amount.token_id, token_id);
 
@@ -1862,7 +1863,7 @@ pub mod transaction_builder_tests {
                         recipient.view_private_key(),
                         &RistrettoPublic::try_from(&output.public_key).unwrap(),
                     );
-                    let (amount, _) = output.masked_amount.get_value(&ss).unwrap();
+                    let (amount, _) = output.get_masked_amount().unwrap().get_value(&ss).unwrap();
                     assert_eq!(amount.value, value - change_value - Mob::MINIMUM_FEE);
                     assert_eq!(amount.token_id, token_id);
 
@@ -1902,7 +1903,7 @@ pub mod transaction_builder_tests {
                         sender.view_private_key(),
                         &RistrettoPublic::try_from(&change.public_key).unwrap(),
                     );
-                    let (amount, _) = change.masked_amount.get_value(&ss).unwrap();
+                    let (amount, _) = change.get_masked_amount().unwrap().get_value(&ss).unwrap();
                     assert_eq!(amount.value, change_value);
                     assert_eq!(amount.token_id, token_id);
 
@@ -2014,7 +2015,7 @@ pub mod transaction_builder_tests {
                         recipient.view_private_key(),
                         &RistrettoPublic::try_from(&output.public_key).unwrap(),
                     );
-                    let (amount, _) = output.masked_amount.get_value(&ss).unwrap();
+                    let (amount, _) = output.get_masked_amount().unwrap().get_value(&ss).unwrap();
                     assert_eq!(amount.value, value - change_value - Mob::MINIMUM_FEE);
                     assert_eq!(amount.token_id, token_id);
 
@@ -2036,7 +2037,7 @@ pub mod transaction_builder_tests {
                         sender.view_private_key(),
                         &RistrettoPublic::try_from(&change.public_key).unwrap(),
                     );
-                    let (amount, _) = change.masked_amount.get_value(&ss).unwrap();
+                    let (amount, _) = change.get_masked_amount().unwrap().get_value(&ss).unwrap();
                     assert_eq!(amount.value, change_value);
                     assert_eq!(amount.token_id, token_id);
 
@@ -2192,7 +2193,7 @@ pub mod transaction_builder_tests {
                         bob.view_private_key(),
                         &RistrettoPublic::try_from(&output.public_key).unwrap(),
                     );
-                    let (amount, _) = output.masked_amount.get_value(&ss).unwrap();
+                    let (amount, _) = output.get_masked_amount().unwrap().get_value(&ss).unwrap();
                     assert_eq!(amount.value, value - change_value - Mob::MINIMUM_FEE);
                     assert_eq!(amount.token_id, token_id);
 
@@ -2228,7 +2229,7 @@ pub mod transaction_builder_tests {
                         alice.view_private_key(),
                         &RistrettoPublic::try_from(&change.public_key).unwrap(),
                     );
-                    let (amount, _) = change.masked_amount.get_value(&ss).unwrap();
+                    let (amount, _) = change.get_masked_amount().unwrap().get_value(&ss).unwrap();
                     assert_eq!(amount.value, change_value);
                     assert_eq!(amount.token_id, token_id);
 
@@ -3310,7 +3311,8 @@ pub mod transaction_builder_tests {
             );
 
             let (funding_amount, _) = funding_output
-                .masked_amount
+                .get_masked_amount()
+                .unwrap()
                 .get_value(&funding_output_ss)
                 .unwrap();
             assert_eq!(funding_amount.value, funding_output_amount.value);
@@ -3361,7 +3363,7 @@ pub mod transaction_builder_tests {
             };
 
             // Values we pretend we get from locating the TxOut using the global index
-            let masked_amount = funding_output.masked_amount.clone();
+            let masked_amount = funding_output.get_masked_amount().unwrap().clone();
 
             // Construct the sender Tx from the combo of "located" and "sent" information
             let (sending_input_amount, blinding) = masked_amount
@@ -3452,7 +3454,7 @@ pub mod transaction_builder_tests {
                 receiver.view_private_key(),
                 &RistrettoPublic::try_from(&change.public_key).unwrap(),
             );
-            let (amount, _) = change.masked_amount.get_value(&ss).unwrap();
+            let (amount, _) = change.get_masked_amount().unwrap().get_value(&ss).unwrap();
             assert_eq!(amount.value, sending_output_amount.value);
             assert_eq!(amount.token_id, token_id);
 
@@ -3527,7 +3529,7 @@ pub mod transaction_builder_tests {
                 sender.view_private_key(),
                 &RistrettoPublic::try_from(&change.public_key).unwrap(),
             );
-            let (amount, _) = change.masked_amount.get_value(&ss).unwrap();
+            let (amount, _) = change.get_masked_amount().unwrap().get_value(&ss).unwrap();
             assert_eq!(amount.value, cancellation_output_amount.value);
             assert_eq!(amount.token_id, token_id);
 

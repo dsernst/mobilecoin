@@ -9,7 +9,7 @@ use mc_crypto_keys::{CompressedRistrettoPublic, KeyError, RistrettoPrivate, Rist
 use mc_transaction_core::{
     encrypted_fog_hint::{EncryptedFogHint, ENCRYPTED_FOG_HINT_LEN},
     tx::TxOut,
-    AmountError, EncryptedMemo, MaskedAmount, MemoError,
+    AmountError, EncryptedMemo, MemoError, VersionedMaskedAmount,
 };
 use prost::Message;
 use serde::{Deserialize, Serialize};
@@ -236,9 +236,14 @@ pub struct TxOutRecord {
     pub tx_out_e_memo_data: Vec<u8>,
 
     /// The masked token id associated to the amount field in the TxOut that
-    /// was recovered
+    /// was recovered. This is used when the masked amount has version 1.
     #[prost(bytes, tag = "10")]
     pub tx_out_amount_masked_token_id: Vec<u8>,
+
+    /// The masked token id associated to the amount field in the TxOut that
+    /// was recovered. This is used when the masked amount has version 2.
+    #[prost(bytes, tag = "11")]
+    pub tx_out_amount_v2_masked_token_id: Vec<u8>,
 }
 
 impl TxOutRecord {
@@ -255,6 +260,7 @@ impl TxOutRecord {
             tx_out_amount_commitment_data_crc32: fog_tx_out.amount_commitment_data_crc32,
             tx_out_amount_masked_value: fog_tx_out.amount_masked_value,
             tx_out_amount_masked_token_id: fog_tx_out.amount_masked_token_id,
+            tx_out_amount_v2_masked_token_id: fog_tx_out.amount_v2_masked_token_id,
             tx_out_target_key_data: fog_tx_out.target_key.as_bytes().to_vec(),
             tx_out_public_key_data: fog_tx_out.public_key.as_bytes().to_vec(),
             tx_out_e_memo_data: fog_tx_out
@@ -276,6 +282,7 @@ impl TxOutRecord {
             public_key: CompressedRistrettoPublic::try_from(&self.tx_out_public_key_data[..])?,
             amount_masked_value: self.tx_out_amount_masked_value,
             amount_masked_token_id: self.tx_out_amount_masked_token_id.clone(),
+            amount_v2_masked_token_id: self.tx_out_amount_v2_masked_token_id.clone(),
             amount_commitment_data_crc32: self.get_amount_data_crc32()?,
             e_memo: self.get_e_memo()?,
         })
@@ -334,6 +341,9 @@ pub struct FogTxOut {
     /// The tx out masked token id
     pub amount_masked_token_id: Vec<u8>,
 
+    /// The tx out masked token id for version 2
+    pub amount_v2_masked_token_id: Vec<u8>,
+
     /// The crc32 of the tx out amount commitment bytes
     pub amount_commitment_data_crc32: u32,
 
@@ -344,16 +354,35 @@ pub struct FogTxOut {
 // Convert a TxOut to a FogTxOut in the efficient way (omitting compressed
 // commitment)
 impl core::convert::From<&TxOut> for FogTxOut {
-    #[inline]
     fn from(src: &TxOut) -> Self {
-        Self {
-            target_key: src.target_key,
-            public_key: src.public_key,
-            amount_masked_value: src.masked_amount.masked_value,
-            amount_masked_token_id: src.masked_amount.masked_token_id.clone(),
-            amount_commitment_data_crc32: Crc::<u32>::new(&crc::CRC_32_ISO_HDLC)
-                .checksum(src.masked_amount.commitment.point.as_bytes()),
-            e_memo: src.e_memo,
+        match src.get_masked_amount() {
+            Err(_) => Self {
+                target_key: src.target_key,
+                public_key: src.public_key,
+                amount_masked_value: Default::default(),
+                amount_masked_token_id: Default::default(),
+                amount_v2_masked_token_id: Default::default(),
+                amount_commitment_data_crc32: Default::default(),
+                e_memo: src.e_memo,
+            },
+            Ok(VersionedMaskedAmount::V1(masked_amount)) => Self {
+                target_key: src.target_key,
+                public_key: src.public_key,
+                amount_masked_value: masked_amount.masked_value,
+                amount_masked_token_id: masked_amount.masked_token_id.clone(),
+                amount_v2_masked_token_id: Default::default(),
+                amount_commitment_data_crc32: masked_amount.commitment_crc32(),
+                e_memo: src.e_memo,
+            },
+            Ok(VersionedMaskedAmount::V2(masked_amount)) => Self {
+                target_key: src.target_key,
+                public_key: src.public_key,
+                amount_masked_value: masked_amount.masked_value,
+                amount_masked_token_id: Default::default(),
+                amount_v2_masked_token_id: masked_amount.masked_token_id.clone(),
+                amount_commitment_data_crc32: masked_amount.commitment_crc32(),
+                e_memo: src.e_memo,
+            },
         }
     }
 }
@@ -381,19 +410,34 @@ impl FogTxOut {
         let tx_out_shared_secret =
             mc_transaction_core::get_tx_out_shared_secret(view_key, &public_key);
 
-        let (masked_amount, _) = MaskedAmount::reconstruct(
-            self.amount_masked_value,
-            &self.amount_masked_token_id,
-            &tx_out_shared_secret,
-        )
-        .map_err(|_| FogTxOutError::ChecksumMismatch)?;
+        // Reconstruct the correct masked amount version, based on which proto fields
+        // were present If this is a v2 amount, then the
+        // amount_v2_masked_token_id field will be nonzero Otherwise it must be
+        // v1
+        let masked_amount = if !self.amount_v2_masked_token_id.is_empty() {
+            let (masked_amount, _) = VersionedMaskedAmount::reconstruct_v2(
+                self.amount_masked_value,
+                &self.amount_v2_masked_token_id,
+                &tx_out_shared_secret,
+            )
+            .map_err(FogTxOutError::Amount)?;
+            masked_amount
+        } else {
+            let (masked_amount, _) = VersionedMaskedAmount::reconstruct_v1(
+                self.amount_masked_value,
+                &self.amount_masked_token_id,
+                &tx_out_shared_secret,
+            )
+            .map_err(FogTxOutError::Amount)?;
+            masked_amount
+        };
 
         if masked_amount.commitment_crc32() != self.amount_commitment_data_crc32 {
             return Err(FogTxOutError::ChecksumMismatch);
         }
 
         Ok(TxOut {
-            masked_amount,
+            masked_amount: Some(masked_amount),
             target_key: self.target_key,
             public_key: self.public_key,
             e_fog_hint: EncryptedFogHint::from(&[0u8; ENCRYPTED_FOG_HINT_LEN]),

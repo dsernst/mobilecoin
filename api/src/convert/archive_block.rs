@@ -1,3 +1,5 @@
+// Copyright (c) 2018-2022 The MobileCoin Foundation
+
 //! Convert to/from blockchain::ArchiveBlock
 
 use crate::{blockchain, convert::ConversionError};
@@ -116,15 +118,14 @@ impl TryFrom<&blockchain::ArchiveBlocks> for Vec<mc_transaction_core::BlockData>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mc_crypto_keys::{Ed25519Private, RistrettoPublic};
+    use mc_crypto_keys::{Ed25519Private, RistrettoPrivate};
     use mc_transaction_core::{
-        encrypted_fog_hint::ENCRYPTED_FOG_HINT_LEN,
         membership_proofs::Range,
         ring_signature::KeyImage,
         tokens::Mob,
         tx::{TxOut, TxOutMembershipElement, TxOutMembershipHash},
         Amount, Block, BlockContents, BlockData, BlockID, BlockSignature, BlockVersion,
-        MaskedAmount, Token,
+        PublicAddress, Token,
     };
     use mc_util_from_random::FromRandom;
     use rand::{rngs::StdRng, SeedableRng};
@@ -139,14 +140,15 @@ mod tests {
                 value: 1u64 << 13,
                 token_id: Mob::ID,
             };
-            let tx_out = TxOut {
-                masked_amount: MaskedAmount::new(amount, &RistrettoPublic::from_random(&mut rng))
-                    .unwrap(),
-                target_key: RistrettoPublic::from_random(&mut rng).into(),
-                public_key: RistrettoPublic::from_random(&mut rng).into(),
-                e_fog_hint: (&[0u8; ENCRYPTED_FOG_HINT_LEN]).into(),
-                e_memo: None,
-            };
+            let tx_out = TxOut::new(
+                BlockVersion::ZERO,
+                amount,
+                &PublicAddress::from_random(&mut rng),
+                &RistrettoPrivate::from_random(&mut rng),
+                Default::default(),
+            )
+            .unwrap();
+
             let key_image = KeyImage::from(block_idx);
 
             let parent_block_id = last_block
