@@ -245,10 +245,7 @@ mod test {
         for output_index in 0..num_tx_outs {
             let recipient_account_default_subaddress = recipient_account.default_subaddress();
             let tx_secret_key = RistrettoPrivate::from_random(&mut rng);
-            let amount = Amount {
-                value: value + output_index as u64,
-                token_id: Mob::ID,
-            };
+            let amount = Amount::new(value + output_index as u64, Mob::ID);
             let tx_out = TxOut::new(
                 BlockVersion::ZERO,
                 amount,
