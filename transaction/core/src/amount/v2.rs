@@ -187,6 +187,7 @@ impl MaskedAmountV2 {
         let token_id = TokenId::from(match masked_token_id.len() {
             0 => 0,
             TokenId::NUM_BYTES => {
+                // Safety: We just checked masked_token_id.len() == TokenId::NUM_BYTES
                 u64::from_le_bytes(masked_token_id.try_into().unwrap()) ^ token_id_mask
             }
             _ => return Err(AmountError::InvalidMaskedTokenId),
