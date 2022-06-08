@@ -189,6 +189,7 @@ impl MaskedAmount {
         match masked_token_id.len() {
             0 => Ok(0),
             TokenId::NUM_BYTES => {
+                // Safety: We just checked masked_token_id.len() == TokenId::NUM_BYTES
                 let masked_token_id_val = u64::from_le_bytes(masked_token_id.try_into().unwrap());
                 Ok(masked_token_id_val ^ get_token_id_mask(tx_out_shared_secret))
             }
