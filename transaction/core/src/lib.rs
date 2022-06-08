@@ -38,7 +38,7 @@ pub mod validation;
 #[cfg(test)]
 pub mod proptest_fixtures;
 
-pub use amount::{AmountError, MaskedAmount, MaskedAmountV2, VersionedMaskedAmount};
+pub use amount::{AmountError, MaskedAmountV1, MaskedAmountV2, VersionedMaskedAmount};
 pub use blockchain::*;
 pub use input_rules::{InputRuleError, InputRules};
 pub use memo::{EncryptedMemo, MemoError, MemoPayload};

@@ -49,7 +49,7 @@ use mc_transaction_core::{
     ring_signature::KeyImage,
     tokens::Mob,
     tx::{Tx, TxOut, TxOutConfirmationNumber, TxOutMembershipProof},
-    Amount, BlockVersion, CompressedCommitment, MaskedAmount, Token,
+    Amount, BlockVersion, CompressedCommitment, MaskedAmountV1, Token,
 };
 use mc_transaction_std::{
     AuthenticatedSenderMemo, AuthenticatedSenderWithPaymentRequestIdMemo, DestinationMemo,
@@ -321,7 +321,9 @@ pub unsafe extern "C" fn Java_com_mobilecoin_lib_Amount_init_1jni(
 
         // FIXME #1595: We should get a masked token id also, here we default to
         // 0 bytes, which is backwards compatible
-        let masked_amount = MaskedAmount {
+        // FIXME: This should probably be VersionedMaskedAmount instead, and we
+        // should pass enough data to decide whether to use V1 or V2
+        let masked_amount = MaskedAmountV1 {
             commitment: CompressedCommitment::try_from(&commitment_bytes[..])?,
             masked_value: masked_value as u64,
             masked_token_id: Default::default(),
@@ -342,8 +344,10 @@ pub unsafe extern "C" fn Java_com_mobilecoin_lib_Amount_init_1jni_1with_1secret(
             env.get_rust_field(tx_out_shared_secret, RUST_OBJ_FIELD)?;
         // FIXME #1595: the masked token id should be 0 or 4 bytes.
         // To avoid breaking changes, it is hard coded to 0 bytes here
+        // FIXME: This should probably be VersionedMaskedAmount instead, and we
+        // should pass enough data to decide whether to use V1 or V2
         let masked_amount =
-            MaskedAmount::reconstruct(masked_value as u64, &[], &tx_out_shared_secret)?;
+            MaskedAmountV1::reconstruct(masked_value as u64, &[], &tx_out_shared_secret)?;
 
         Ok(env.set_rust_field(obj, RUST_OBJ_FIELD, masked_amount)?)
     })
@@ -358,7 +362,7 @@ pub unsafe extern "C" fn Java_com_mobilecoin_lib_Amount_get_1bytes(
         || Ok(JObject::null().into_inner()),
         &env,
         |env| {
-            let amount_key: MutexGuard<MaskedAmount> = env.get_rust_field(obj, RUST_OBJ_FIELD)?;
+            let amount_key: MutexGuard<MaskedAmountV1> = env.get_rust_field(obj, RUST_OBJ_FIELD)?;
             let bytes = mc_util_serial::encode(&*amount_key);
             Ok(env.byte_array_from_slice(&bytes)?)
         },
@@ -368,7 +372,7 @@ pub unsafe extern "C" fn Java_com_mobilecoin_lib_Amount_get_1bytes(
 #[no_mangle]
 pub unsafe extern "C" fn Java_com_mobilecoin_lib_Amount_finalize_1jni(env: JNIEnv, obj: JObject) {
     jni_ffi_call(&env, |env| {
-        let _: MaskedAmount = env.take_rust_field(obj, RUST_OBJ_FIELD)?;
+        let _: MaskedAmountV1 = env.take_rust_field(obj, RUST_OBJ_FIELD)?;
         Ok(())
     })
 }
@@ -384,7 +388,7 @@ pub unsafe extern "C" fn Java_com_mobilecoin_lib_Amount_unmask_1value(
         || Ok(JObject::null().into_inner()),
         &env,
         |env| {
-            let masked_amount: MutexGuard<MaskedAmount> =
+            let masked_amount: MutexGuard<MaskedAmountV1> =
                 env.get_rust_field(obj, RUST_OBJ_FIELD)?;
             let view_key: MutexGuard<RistrettoPrivate> =
                 env.get_rust_field(view_key, RUST_OBJ_FIELD)?;

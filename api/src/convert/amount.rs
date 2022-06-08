@@ -4,7 +4,7 @@
 
 use crate::{convert::ConversionError, external};
 use mc_transaction_core::{
-    CompressedCommitment, MaskedAmount, MaskedAmountV2, VersionedMaskedAmount,
+    CompressedCommitment, MaskedAmountV1, MaskedAmountV2, VersionedMaskedAmount,
 };
 use mc_util_repr_bytes::ReprBytes;
 use std::convert::TryFrom;
@@ -13,8 +13,8 @@ use std::convert::TryFrom;
 // external::MaskedAmount is a proto message
 // external::TxOut_oneof_masked_amount is a proto oneof
 
-impl From<&MaskedAmount> for external::MaskedAmount {
-    fn from(source: &MaskedAmount) -> Self {
+impl From<&MaskedAmountV1> for external::MaskedAmount {
+    fn from(source: &MaskedAmountV1) -> Self {
         let commitment_bytes = source.commitment.to_bytes().to_vec();
         let mut amount = external::MaskedAmount::new();
         amount.mut_commitment().set_data(commitment_bytes);
@@ -48,14 +48,14 @@ impl From<&VersionedMaskedAmount> for external::TxOut_oneof_masked_amount {
     }
 }
 
-impl TryFrom<&external::MaskedAmount> for MaskedAmount {
+impl TryFrom<&external::MaskedAmount> for MaskedAmountV1 {
     type Error = ConversionError;
 
     fn try_from(source: &external::MaskedAmount) -> Result<Self, Self::Error> {
         let commitment = CompressedCommitment::try_from(source.get_commitment())?;
         let masked_value = source.get_masked_value();
         let masked_token_id = source.get_masked_token_id();
-        let amount = MaskedAmount {
+        let amount = MaskedAmountV1 {
             commitment,
             masked_value,
             masked_token_id: masked_token_id.to_vec(),

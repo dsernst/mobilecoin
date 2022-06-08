@@ -21,7 +21,7 @@ mod error;
 pub use error::AmountError;
 
 mod v1;
-pub use v1::MaskedAmount;
+pub use v1::MaskedAmountV1;
 
 mod v2;
 pub use v2::MaskedAmountV2;
@@ -33,7 +33,7 @@ pub enum VersionedMaskedAmount {
     /// A v1 masked amount.
     /// Note: This tag must match the historical tag used for masked amounts
     #[prost(message, tag = "1")]
-    V1(MaskedAmount),
+    V1(MaskedAmountV1),
     /// A v2 masked amount.
     /// Note: This tag must match what is listed in `tags` for the oneof field
     /// in TxOut
@@ -58,7 +58,7 @@ impl VersionedMaskedAmount {
         Ok(if block_version.masked_amount_v2_is_supported() {
             Self::V2(MaskedAmountV2::new(amount, tx_out_shared_secret)?)
         } else {
-            let mut masked_amount = MaskedAmount::new(amount, tx_out_shared_secret)?;
+            let mut masked_amount = MaskedAmountV1::new(amount, tx_out_shared_secret)?;
             if !block_version.masked_token_id_feature_is_supported() {
                 masked_amount.masked_token_id.clear();
             }
@@ -147,7 +147,7 @@ impl VersionedMaskedAmount {
         shared_secret: &RistrettoPublic,
     ) -> Result<(Self, Amount), AmountError> {
         let (result, amount) =
-            MaskedAmount::reconstruct(masked_value, masked_token_id, shared_secret)?;
+            MaskedAmountV1::reconstruct(masked_value, masked_token_id, shared_secret)?;
         Ok((Self::V1(result), amount))
     }
 

@@ -20,7 +20,7 @@ use mc_transaction_core::{
     ring_signature::KeyImage,
     tokens::Mob,
     tx::{TxOut, TxOutConfirmationNumber, TxOutMembershipProof},
-    Amount, BlockVersion, CompressedCommitment, EncryptedMemo, MaskedAmount, Token,
+    Amount, BlockVersion, CompressedCommitment, EncryptedMemo, MaskedAmountV1, Token,
 };
 use mc_transaction_std::{
     AuthenticatedSenderMemo, AuthenticatedSenderWithPaymentRequestIdMemo, DestinationMemo,
@@ -61,8 +61,11 @@ pub extern "C" fn mc_tx_out_reconstruct_commitment(
 
         // FIXME #1596: McTxOutAmount should include the masked_token_id bytes, which
         // are 0 or 4 bytes For now zero to avoid breaking changes to FFI
+        // FIXME: We should either make this use VersionedMaskedAmount instead and pass
+        // some data to tell us which version to try to reconstruct, or
+        // have a second version of this function for MaskedAmountV2
         let (masked_amount, _) =
-            MaskedAmount::reconstruct(tx_out_amount.masked_value, &[], &shared_secret)?;
+            MaskedAmountV1::reconstruct(tx_out_amount.masked_value, &[], &shared_secret)?;
 
         let out_tx_out_commitment = out_tx_out_commitment
             .into_mut()
@@ -211,8 +214,10 @@ pub extern "C" fn mc_tx_out_get_value(
         let view_private_key = RistrettoPrivate::try_from_ffi(&view_private_key)?;
 
         let shared_secret = get_tx_out_shared_secret(&view_private_key, &tx_out_public_key);
+        // FIXME: This should probably be VersionedMaskedAmount instead, and we
+        // should pass enough data to decide whether to use V1 or V2
         let (_masked_amount, amount) =
-            MaskedAmount::reconstruct(tx_out_amount.masked_value, &[], &shared_secret)?;
+            MaskedAmountV1::reconstruct(tx_out_amount.masked_value, &[], &shared_secret)?;
 
         // FIXME #1596: This should also return the amount.token_id
         *out_value.into_mut() = amount.value;

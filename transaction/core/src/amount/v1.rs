@@ -27,7 +27,7 @@ use zeroize::Zeroize;
 /// receiver know the value and token id.
 #[derive(Clone, Deserialize, Digestible, Eq, Hash, Message, PartialEq, Serialize, Zeroize)]
 #[digestible(name = "Amount")]
-pub struct MaskedAmount {
+pub struct MaskedAmountV1 {
     /// A Pedersen commitment `v*H + b*G` to a quantity `v` of MobileCoin or a
     /// related token, with blinding `b`,
     #[prost(message, required, tag = "1")]
@@ -44,7 +44,7 @@ pub struct MaskedAmount {
     pub masked_token_id: Vec<u8>,
 }
 
-impl MaskedAmount {
+impl MaskedAmountV1 {
     /// Creates a commitment `value*H + blinding*G`, and "masks" the commitment
     /// secrets so that they can be recovered by the recipient.
     ///
@@ -56,7 +56,7 @@ impl MaskedAmount {
     pub fn new(
         amount: Amount,
         tx_out_shared_secret: &RistrettoPublic,
-    ) -> Result<MaskedAmount, AmountError> {
+    ) -> Result<Self, AmountError> {
         // The blinding is `Blake2B("blinding" | shared_secret)`
         let blinding: Scalar = get_blinding(tx_out_shared_secret);
 
@@ -75,7 +75,7 @@ impl MaskedAmount {
         let masked_token_id_val: u64 = *amount.token_id ^ get_token_id_mask(tx_out_shared_secret);
         let masked_token_id = masked_token_id_val.to_le_bytes().to_vec();
 
-        Ok(MaskedAmount {
+        Ok(MaskedAmountV1 {
             commitment,
             masked_value,
             masked_token_id,
@@ -255,7 +255,7 @@ mod amount_tests {
                 token_id in any::<u64>(),
                 shared_secret in arbitrary_ristretto_public()) {
                     let amount = Amount { value, token_id: token_id.into() };
-                assert!(MaskedAmount::new(amount, &shared_secret).is_ok());
+                assert!(MaskedAmountV1::new(amount, &shared_secret).is_ok());
             }
 
             #[test]
@@ -266,7 +266,7 @@ mod amount_tests {
                 token_id in any::<u64>(),
                 shared_secret in arbitrary_ristretto_public()) {
                     let amount = Amount { value, token_id: token_id.into() };
-                    let amount = MaskedAmount::new(amount, &shared_secret).unwrap();
+                    let amount = MaskedAmountV1::new(amount, &shared_secret).unwrap();
                     let blinding = get_blinding(&shared_secret);
                     let expected_commitment = CompressedCommitment::new(value, blinding, &generators(token_id));
                     assert_eq!(amount.commitment, expected_commitment);
@@ -280,10 +280,10 @@ mod amount_tests {
                 shared_secret in arbitrary_ristretto_public())
             {
                 let amount = Amount { value, token_id: token_id.into() };
-                let masked_amount = MaskedAmount::new(amount, &shared_secret).unwrap();
+                let masked_amount = MaskedAmountV1::new(amount, &shared_secret).unwrap();
                 assert_eq!(
                     value,
-                    MaskedAmount::unmask_value(masked_amount.masked_value, &shared_secret)
+                    MaskedAmountV1::unmask_value(masked_amount.masked_value, &shared_secret)
                 );
             }
 
@@ -294,7 +294,7 @@ mod amount_tests {
                 token_id in any::<u64>(),
                 shared_secret in arbitrary_ristretto_public()) {
                 let amount = Amount { value, token_id: token_id.into() };
-                let masked_amount = MaskedAmount::new(amount, &shared_secret).unwrap();
+                let masked_amount = MaskedAmountV1::new(amount, &shared_secret).unwrap();
                 let result = masked_amount.get_value(&shared_secret);
                 let blinding = get_blinding(&shared_secret);
                 let expected = Ok((amount, blinding));
@@ -313,7 +313,7 @@ mod amount_tests {
                 // Mutate amount to use a different masked value.
                 // With high probability, amount.masked_value won't equal other_masked_value.
                 let amount = Amount { value, token_id: token_id.into() };
-                let mut masked_amount = MaskedAmount::new(amount, &shared_secret).unwrap();
+                let mut masked_amount = MaskedAmountV1::new(amount, &shared_secret).unwrap();
                 masked_amount.masked_value = other_masked_value;
                 let result = masked_amount.get_value(&shared_secret);
                 let expected = Err(AmountError::InconsistentCommitment);
@@ -329,7 +329,7 @@ mod amount_tests {
                 other_shared_secret in arbitrary_ristretto_public(),
             ) {
                 let amount = Amount { value, token_id: token_id.into() };
-                let masked_amount = MaskedAmount::new(amount,  &shared_secret).unwrap();
+                let masked_amount = MaskedAmountV1::new(amount,  &shared_secret).unwrap();
                 let result = masked_amount.get_value(&other_shared_secret);
                 let expected = Err(AmountError::InconsistentCommitment);
                 assert_eq!(result, expected);
