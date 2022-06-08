@@ -6,6 +6,9 @@ mod block_audit_data;
 mod block_balance;
 mod conn;
 mod counters;
+mod gnosis_safe_deposit;
+mod gnosis_safe_tx;
+mod gnosis_safe_withdrawal;
 mod models;
 mod schema;
 #[cfg(test)]
@@ -31,6 +34,11 @@ pub use block_audit_data::{BlockAuditData, BlockAuditDataModel};
 pub use block_balance::{BlockBalance, BlockBalanceModel};
 pub use conn::{Conn, ConnectionOptions};
 pub use counters::{Counters, CountersModel};
+pub use gnosis_safe_deposit::{GnosisSafeDeposit, GnosisSafeDepositModel};
+pub use gnosis_safe_tx::{GnosisSafeTx, GnosisSafeTxModel};
+pub use gnosis_safe_withdrawal::{
+    GnosisSafeWithdrawal, GnosisSafeWithdrawalModel, NewGnosisSafeWithdrawal,
+};
 pub use transaction::{transaction, TransactionRetriableError};
 
 embed_migrations!("migrations/");

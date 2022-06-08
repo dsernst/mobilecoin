@@ -12,7 +12,7 @@ use mc_mint_auditor::{
         transaction, BlockAuditData, BlockAuditDataModel, BlockBalance, BlockBalanceModel,
         Counters, CountersModel, MintAuditorDb,
     },
-    gnosis::GnosisSafeConfig,
+    gnosis::{FetcherThread, GnosisSafeConfig},
     Error, MintAuditorService,
 };
 use mc_mint_auditor_api::MintAuditorUri;
@@ -99,7 +99,7 @@ fn main() {
             poll_interval,
             listen_uri,
             admin_listen_uri,
-            gnosis_safe_config: _gnosis_safe_config,
+            gnosis_safe_config,
         } => {
             cmd_scan_ledger(
                 ledger_db,
@@ -107,6 +107,7 @@ fn main() {
                 poll_interval,
                 listen_uri,
                 admin_listen_uri,
+                gnosis_safe_config,
                 logger,
             );
         }
@@ -128,6 +129,7 @@ fn cmd_scan_ledger(
     poll_interval: Duration,
     listen_uri: Option<MintAuditorUri>,
     admin_listen_uri: Option<AdminUri>,
+    gnosis_safe_config: Option<GnosisSafeConfig>,
     logger: Logger,
 ) {
     let ledger_db = LedgerDB::open(&ledger_db_path).expect("Could not open ledger DB");
@@ -177,6 +179,24 @@ fn cmd_scan_ledger(
             logger.clone(),
         )
         .expect("Failed starting admin grpc server")
+    });
+
+    let _gnosis_safe_fetcher_threads = gnosis_safe_config.map(|gnosis_safe_config| {
+        gnosis_safe_config
+            .safes
+            .iter()
+            .map(|safe_config| {
+                FetcherThread::start(
+                    safe_config.safe_addr.to_string(), // TODO
+                    mint_auditor_db.clone(),
+                    ledger_db.clone(),
+                    poll_interval,
+                    safe_config.api_url.clone(),
+                    logger.clone(),
+                )
+                .expect("Failed starting gnosis safe fetcher thread")
+            })
+            .collect::<Vec<_>>()
     });
 
     loop {

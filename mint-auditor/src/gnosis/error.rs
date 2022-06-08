@@ -6,6 +6,7 @@ use displaydoc::Display;
 use serde_json::Error as JsonError;
 use std::io::Error as IoError;
 use toml::de::Error as TomlError;
+use url::ParseError;
 
 /// Error data type for Gnosis-related functionality.
 #[derive(Debug, Display)]
@@ -27,6 +28,12 @@ pub enum Error {
 
     /// Invalid address: {0}
     InvalidAddress(String),
+
+    /// URL parse error: {0}
+    UrlParse(ParseError),
+
+    /// Other: {0}
+    Other(String),
 }
 
 impl From<JsonError> for Error {
@@ -44,5 +51,11 @@ impl From<TomlError> for Error {
 impl From<IoError> for Error {
     fn from(src: IoError) -> Self {
         Self::Io(src)
+    }
+}
+
+impl From<ParseError> for Error {
+    fn from(src: ParseError) -> Self {
+        Self::UrlParse(src)
     }
 }

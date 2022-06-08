@@ -3,7 +3,7 @@
 //! Mint auditor error data type.
 
 use crate::{db::TransactionRetriableError, gnosis::Error as GnosisError};
-use diesel::result::Error as DieselError;
+use diesel::result::{DatabaseErrorKind, Error as DieselError};
 use diesel_migrations::RunMigrationsError;
 use displaydoc::Display;
 use mc_ledger_db::Error as LedgerDbError;
@@ -16,6 +16,9 @@ use std::io::Error as IoError;
 pub enum Error {
     /// Not found
     NotFound,
+
+    /// Already exists: {0}
+    AlreadyExists(String),
 
     /// IO: {0}
     Io(IoError),
@@ -67,6 +70,9 @@ impl From<DieselError> for Error {
     fn from(err: DieselError) -> Self {
         match err {
             DieselError::NotFound => Self::NotFound,
+            DieselError::DatabaseError(DatabaseErrorKind::UniqueViolation, info) => {
+                Self::AlreadyExists(info.message().to_string())
+            }
             err => Self::Diesel(err),
         }
     }

@@ -52,6 +52,112 @@ impl BlockBalance {
     }
 }
 
+/// Diesel model for the `gnosis_safe_txs` table.
+/// This table stores txs into the monitored gnosis safe.
+#[derive(Debug, Default, Deserialize, Eq, PartialEq, Insertable, Queryable, Serialize)]
+pub struct GnosisSafeTx {
+    /// Ethereum transaction hash.
+    pub eth_tx_hash: String,
+
+    /// The JSON representation of the transaction, as served from the gnosis
+    /// API.
+    pub raw_tx_json: String,
+}
+
+/// Diesel model for the `gnosis_safe_deposits` table.
+/// This table stores deposits into the monitored gnosis safe.
+#[derive(Debug, Default, Deserialize, Eq, PartialEq, Queryable, Serialize)]
+pub struct GnosisSafeDeposit {
+    /// Id (required to keep Diesel happy).
+    pub id: i32,
+
+    /// Ethereum transaction hash.
+    pub eth_tx_hash: String,
+
+    /// Gnosis safe address receiving the deposit.
+    pub safe_address: String,
+
+    /// Token contract address that is being deposited.
+    pub token_address: String,
+
+    /// Amount deposited.
+    pub amount: i64,
+}
+
+impl GnosisSafeDeposit {
+    /// Get amount deposited.
+    pub fn amount(&self) -> u64 {
+        self.amount as u64
+    }
+}
+
+/// This table stores deposits into the monitored gnosis safe.
+#[derive(Debug, Default, Deserialize, Eq, PartialEq, Insertable, Serialize)]
+#[table_name = "gnosis_safe_deposits"]
+pub struct NewGnosisSafeDeposit {
+    /// Ethereum transaction hash.
+    pub eth_tx_hash: String,
+
+    /// Gnosis safe address receiving the deposit.
+    pub safe_address: String,
+
+    /// Token contract address that is being deposited.
+    pub token_address: String,
+
+    /// Amount deposited.
+    pub amount: i64,
+}
+
+/// Diesel model for the `gnosis_safe_withdrawals` table.
+/// This table stores withdrawals into the monitored gnosis safe.
+#[derive(Debug, Default, Deserialize, Eq, PartialEq, Queryable, Serialize)]
+pub struct GnosisSafeWithdrawal {
+    /// Id (required to keep Diesel happy).
+    pub id: i32,
+
+    /// Ethereum transaction hash.
+    pub eth_tx_hash: String,
+
+    /// Gnosis safe address receiving the withdrawal.
+    pub safe_address: String,
+
+    /// Token contract address that is being withdrawn.
+    pub token_address: String,
+
+    /// Amount withdrawan.
+    pub amount: i64,
+
+    /// Associated mobilecoin transaction public key.
+    pub mobilecoin_tx_out_public_key_hex: String,
+}
+
+impl GnosisSafeWithdrawal {
+    /// Get amount withdrawan.
+    pub fn amount(&self) -> u64 {
+        self.amount as u64
+    }
+}
+
+/// This table stores withdrawals into the monitored gnosis safe.
+#[derive(Debug, Default, Deserialize, Eq, PartialEq, Insertable, Serialize)]
+#[table_name = "gnosis_safe_withdrawals"]
+pub struct NewGnosisSafeWithdrawal {
+    /// Ethereum transaction hash.
+    pub eth_tx_hash: String,
+
+    /// Gnosis safe address receiving the withdrawal.
+    pub safe_address: String,
+
+    /// Token contract address that is being withdrawn.
+    pub token_address: String,
+
+    /// Amount withdrawan.
+    pub amount: i64,
+
+    /// Associated mobilecoin transaction public key.
+    pub mobilecoin_tx_out_public_key_hex: String,
+}
+
 /// Diesel model for the `counters` table.
 /// This stores a bunch of general purpose counters. There is only ever one row
 /// in this table.
