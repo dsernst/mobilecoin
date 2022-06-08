@@ -5,7 +5,7 @@
 use displaydoc::Display;
 
 /// An error which can occur when handling an amount commitment.
-#[derive(Debug, Display, Eq, PartialEq, Clone)]
+#[derive(Clone, Debug, Display, Eq, PartialEq)]
 pub enum AmountError {
     /**
      * The masked value, token id, or shared secret are not consistent with
