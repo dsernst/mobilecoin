@@ -12,7 +12,7 @@ use mc_mint_auditor::{
         transaction, BlockAuditData, BlockAuditDataModel, BlockBalance, BlockBalanceModel,
         Counters, CountersModel, MintAuditorDb,
     },
-    gnosis::{FetcherThread, GnosisSafeConfig},
+    gnosis::{GnosisSafeConfig, GnosisSyncThread},
     Error, MintAuditorService,
 };
 use mc_mint_auditor_api::MintAuditorUri;
@@ -186,10 +186,9 @@ fn cmd_scan_ledger(
             .safes
             .iter()
             .map(|safe_config| {
-                FetcherThread::start(
+                GnosisSyncThread::start(
                     safe_config,
                     mint_auditor_db.clone(),
-                    ledger_db.clone(),
                     poll_interval,
                     logger.clone(),
                 )

@@ -5,7 +5,8 @@
 mod config;
 mod error;
 mod eth_data_types;
-mod fetcher_thread;
+mod sync;
+mod sync_thread;
 
 pub mod api_data_types;
 pub mod fetcher; // TODO not pub // TODO
@@ -15,5 +16,6 @@ pub use self::{
     error::Error,
     eth_data_types::EthAddr,
     fetcher::EthTxHash,
-    fetcher_thread::FetcherThread,
+    sync::GnosisSync,
+    sync_thread::GnosisSyncThread,
 };

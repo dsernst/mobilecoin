@@ -1,11 +1,16 @@
 // Copyright (c) 2018-2022 The MobileCoin Foundation
 
-//! Background thread for periodically fetching data from the Gnosis API.
+//! Code for syncing transactions from the Gnosis API into the SQLite database.
+//!
+//! NOTE: Right now, if the audited safes
+//! configuration changes, one should delete the SQLite database and re-audit.
+//! The code is not smart enough to handle adding/removing safes/tokens for
+//! Gnosis transactions that were already processed.
 
 use super::{
     api_data_types::{EthereumTransaction, MultiSigTransaction, Transaction},
     fetcher::{GnosisSafeFetcher, GnosisSafeTransaction},
-    AuditedSafeConfig, EthAddr,
+    AuditedSafeConfig,
 };
 use crate::{
     db::{
@@ -17,102 +22,17 @@ use crate::{
     gnosis::Error as GnosisError,
 };
 use mc_common::logger::{log, Logger};
-use mc_ledger_db::LedgerDB;
-use std::{
-    str::FromStr,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    thread::{sleep, spawn, JoinHandle},
-    time::Duration,
-};
 
-pub struct FetcherThread {
-    stop_requested: Arc<AtomicBool>,
-    join_handle: Option<JoinHandle<()>>,
-    logger: Logger,
-}
-
-impl FetcherThread {
-    pub fn start(
-        audited_safe: &AuditedSafeConfig,
-        mint_auditor_db: MintAuditorDb,
-        ledger_db: LedgerDB,
-        poll_interval: Duration,
-        logger: Logger,
-    ) -> Result<Self, Error> {
-        let stop_requested = Arc::new(AtomicBool::new(false));
-
-        let thread_stop_requested = stop_requested.clone();
-        let thread_logger = logger.clone();
-        let thread_audited_safe = audited_safe.clone();
-
-        let join_handle = Some(spawn(move || {
-            thread_entry_point(
-                thread_stop_requested,
-                thread_audited_safe,
-                mint_auditor_db,
-                ledger_db,
-                poll_interval,
-                thread_logger,
-            )
-        }));
-
-        Ok(Self {
-            stop_requested,
-            join_handle,
-            logger,
-        })
-    }
-    pub fn stop(&mut self) {
-        log::info!(self.logger, "Stopping fetcher thread...");
-        self.stop_requested.store(true, Ordering::Relaxed);
-        if let Some(join_nandle) = self.join_handle.take() {
-            join_nandle
-                .join()
-                .expect("failed joining gnosis fetcher thread");
-        }
-    }
-}
-
-impl Drop for FetcherThread {
-    fn drop(&mut self) {
-        self.stop();
-    }
-}
-
-fn thread_entry_point(
-    stop_requested: Arc<AtomicBool>,
-    audited_safe: AuditedSafeConfig,
-    mint_auditor_db: MintAuditorDb,
-    _ledger_db: LedgerDB,
-    poll_interval: Duration,
-    logger: Logger,
-) {
-    log::info!(logger, "GnosisFetcher thread started");
-    let worker = FetcherThreadWorker::new(audited_safe, mint_auditor_db, logger.clone())
-        .expect("Failed creating worker");
-
-    loop {
-        if stop_requested.load(Ordering::Relaxed) {
-            log::info!(logger, "GnosisFetcher thread stop trigger received");
-            break;
-        }
-
-        worker.poll();
-        sleep(poll_interval);
-    }
-}
-
-struct FetcherThreadWorker {
+/// An object for syncing transaction data from the Gnosis API into the SQLite
+/// database.
+pub struct GnosisSync {
     fetcher: GnosisSafeFetcher,
     audited_safe: AuditedSafeConfig,
     mint_auditor_db: MintAuditorDb,
     logger: Logger,
 }
 
-impl FetcherThreadWorker {
+impl GnosisSync {
     pub fn new(
         audited_safe: AuditedSafeConfig,
         mint_auditor_db: MintAuditorDb,
@@ -170,8 +90,12 @@ impl FetcherThreadWorker {
                     Transaction::MultiSig(multi_sig_tx) => {
                         self.process_multi_sig_transaction(conn, &multi_sig_tx)?;
                     }
-                    _ => {
-                        log::info!(self.logger, "TODO {:?}", tx);
+                    Transaction::Module(value) => {
+                        log::warn!(
+                            self.logger,
+                            "Got unexpected \"Module\" transaction: {:?}",
+                            value
+                        );
                     }
                 };
 
@@ -181,11 +105,8 @@ impl FetcherThreadWorker {
         }
     }
 
-    pub fn process_eth_transaction(
-        &self,
-        conn: &Conn,
-        tx: &EthereumTransaction,
-    ) -> Result<(), Error> {
+    /// Process an Ethereum transaction.
+    fn process_eth_transaction(&self, conn: &Conn, tx: &EthereumTransaction) -> Result<(), Error> {
         log::trace!(self.logger, "Processing Ethereum transaction: {:?}", tx);
 
         for transfer in &tx.transfers {
@@ -197,13 +118,6 @@ impl FetcherThreadWorker {
                     transfer
                 );
                 GnosisSafeDeposit::insert_eth_transfer(transfer, &conn)?;
-
-                // TODO this is the TUSDT contract address
-                // if token_address == Some("0xd92e713d051c37ebb2561803a3b5fbabc4962431") {
-                //     log::info!(self.logger, "TODO: deposit to safe");
-                // } else {
-                //     log::error!(self.logger, "")
-                // }
                 continue;
             }
             // We don't know what this is.
@@ -220,7 +134,8 @@ impl FetcherThreadWorker {
         Ok(())
     }
 
-    pub fn process_multi_sig_transaction(
+    /// Process a MultiSig transaction.
+    fn process_multi_sig_transaction(
         &self,
         conn: &Conn,
         multi_sig_tx: &MultiSigTransaction,
@@ -249,10 +164,10 @@ impl FetcherThreadWorker {
         Ok(())
     }
 
-    // See if this is a multi-sig withdrawal that uses the auxiliary contract for
-    // recording the tx out public key, and if so parse it into a
-    // [NewGnosisSafeWithdrawal] object.
-    pub fn parse_withdrawal_with_pub_key_multi_sig_tx(
+    /// See if this is a multi-sig withdrawal that uses the auxiliary contract
+    /// for recording the tx out public key, and if so parse it into a
+    /// [NewGnosisSafeWithdrawal] object.
+    fn parse_withdrawal_with_pub_key_multi_sig_tx(
         &self,
         multi_sig_tx: &MultiSigTransaction,
     ) -> Result<NewGnosisSafeWithdrawal, GnosisError> {

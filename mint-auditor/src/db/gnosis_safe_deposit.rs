@@ -26,6 +26,7 @@ impl GnosisSafeDepositModel for GnosisSafeDeposit {
         let obj = NewGnosisSafeDeposit {
             eth_tx_hash: api_obj.tx_hash.clone(),
             safe_address: api_obj.to.to_string(),
+            // Empty token address means ETH
             token_address: api_obj
                 .token_address
                 .clone()
