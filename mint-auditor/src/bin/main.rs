@@ -187,7 +187,7 @@ fn cmd_scan_ledger(
             .iter()
             .map(|safe_config| {
                 FetcherThread::start(
-                    safe_config.safe_addr.to_string(), // TODO
+                    safe_config.safe_addr.clone(), // TODO
                     mint_auditor_db.clone(),
                     ledger_db.clone(),
                     poll_interval,

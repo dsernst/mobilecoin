@@ -5,7 +5,7 @@
 use super::{
     api_data_types::{EthereumTransaction, MultiSigTransaction, Transaction},
     fetcher::{GnosisSafeFetcher, GnosisSafeTransaction},
-    SafeAddr,
+    EthAddr,
 };
 use crate::{
     db::{
@@ -16,6 +16,7 @@ use crate::{
     error::Error,
 };
 use mc_common::logger::{log, Logger};
+use std::str::FromStr;
 use mc_ledger_db::LedgerDB;
 use std::{
     sync::{
@@ -39,7 +40,7 @@ pub struct FetcherThread {
 
 impl FetcherThread {
     pub fn start(
-        safe_addr: SafeAddr,
+        safe_addr: EthAddr,
         mint_auditor_db: MintAuditorDb,
         ledger_db: LedgerDB,
         poll_interval: Duration,
@@ -89,7 +90,7 @@ impl Drop for FetcherThread {
 
 fn thread_entry_point(
     stop_requested: Arc<AtomicBool>,
-    safe_addr: SafeAddr,
+    safe_addr: EthAddr,
     mint_auditor_db: MintAuditorDb,
     _ledger_db: LedgerDB,
     poll_interval: Duration,
@@ -124,7 +125,7 @@ fn thread_entry_point(
 }
 
 struct FetcherThreadWorker {
-    safe_addr: SafeAddr,
+    safe_addr: EthAddr,
     mint_auditor_db: MintAuditorDb,
     logger: Logger,
 }
@@ -180,7 +181,7 @@ impl FetcherThreadWorker {
 
         for transfer in &tx.transfers {
             // See if this is a deposit to the safe.
-            if transfer.to == self.safe_addr {
+            if EthAddr::from_str(&transfer.to)? == self.safe_addr {
                 log::info!(
                     self.logger,
                     "Processing gnosis safe deposit: {:?}",

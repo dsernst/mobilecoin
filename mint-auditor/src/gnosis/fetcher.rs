@@ -22,6 +22,7 @@
 //! 2) until reaching a known hash
 
 use super::{api_data_types, error::Error};
+use super::EthAddr;
 use mc_common::logger::{log, o, Logger};
 use reqwest::{blocking::Client, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -29,93 +30,7 @@ use serde_json::Value;
 use std::str::FromStr;
 use url::Url;
 
-// pub const ETH_TX_HASH_LEN: usize = 32;
-// pub const SAFE_ID_LEN: usize = 20;
-
-// // TODO move somewhere else
-// #[derive(Clone, Debug, Deserialize, Serialize)]
-// pub struct EthTxHash([u8; ETH_TX_HASH_LEN]);
-
-// impl TryFrom<&[u8]> for EthTxHash {
-//     type Error = Error;
-
-//     fn try_from(src: &[u8]) -> Result<Self, Self::Error> {
-//         let bytes: [u8; ETH_TX_HASH_LEN] = src
-//             .try_into()
-//             .map_err(|_| Error::Other("EthTxHash: invalid
-// length".to_string()))?;         Ok(Self(bytes))
-//     }
-// }
-
-// impl FromStr for EthTxHash {
-//     type Err = Error;
-
-//     fn from_str(src: &str) -> Result<Self, Self::Err> {
-//         let bytes = if src.starts_with("0x") {
-//             hex::decode(&src[2..])
-//         } else {
-//             hex::decode(src)
-//         }
-//         .map_err(|_| Error::Other("EthTxHash: invalid hex".to_string()))?;
-//         Self::try_from(&bytes[..])
-//     }
-// }
-
-// impl fmt::Display for EthTxHash {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         write!(f, "{}", hex::encode(self.0))
-//     }
-// }
-
-// impl AsRef<[u8]> for EthTxHash {
-//     fn as_ref(&self) -> &[u8] {
-//         &self.0[..]
-//     }
-// }
-
-pub type SafeAddr = String;
 pub type EthTxHash = String;
-
-// TODO move somewhere else
-// #[derive(Clone, Debug, Deserialize, Serialize)]
-// pub struct SafeAddr([u8; SAFE_ID_LEN]);
-
-// impl TryFrom<&[u8]> for SafeAddr {
-//     type Error = Error;
-
-//     fn try_from(src: &[u8]) -> Result<Self, Self::Error> {
-//         let bytes: [u8; SAFE_ID_LEN] = src
-//             .try_into()
-//             .map_err(|_| Error::Other("SafeAddr: invalid
-// length".to_string()))?;         Ok(Self(bytes))
-//     }
-// }
-
-// impl FromStr for SafeAddr {
-//     type Err = Error;
-
-//     fn from_str(src: &str) -> Result<Self, Self::Err> {
-//         let bytes = if src.starts_with("0x") {
-//             hex::decode(&src[2..])
-//         } else {
-//             hex::decode(src)
-//         }
-//         .map_err(|_| Error::Other("SafeAddr: invalid hex".to_string()))?;
-//         Self::try_from(&bytes[..])
-//     }
-// }
-
-// impl fmt::Display for SafeAddr {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         write!(f, "{}", hex::encode(self.0))
-//     }
-// }
-
-// impl AsRef<[u8]> for SafeAddr {
-//     fn as_ref(&self) -> &[u8] {
-//         &self.0[..]
-//     }
-// }
 
 // TODO move somewhere else
 #[derive(Debug, Deserialize, Serialize)]
@@ -196,7 +111,7 @@ impl GnosisSafeFetcher {
     /// This returns only transactions that were executed and confirmed.
     pub fn get_transaction_data(
         &self,
-        safe_address: &SafeAddr,
+        safe_address: &EthAddr,
     ) -> Result<Vec<GnosisSafeTransaction>, Error> {
         let url = self.base_url.join(&format!(
             "api/v1/safes/{}/all-transactions/?executed=true&queued=false&trusted=true",

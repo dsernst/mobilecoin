@@ -14,6 +14,6 @@ pub use self::{
     config::{AuditedSafeConfig, GnosisSafeConfig},
     error::Error,
     eth_data_types::EthAddr,
-    fetcher::{EthTxHash, SafeAddr},
+    fetcher::EthTxHash,
     fetcher_thread::FetcherThread,
 };
