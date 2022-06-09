@@ -21,59 +21,10 @@
 //! 1) everything
 //! 2) until reaching a known hash
 
-use super::{api_data_types, error::Error, EthAddr};
+use super::{api_data_types, error::Error, EthAddr, RawGnosisTransaction};
 use mc_common::logger::{log, o, Logger};
 use reqwest::{blocking::Client, StatusCode};
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::str::FromStr;
 use url::Url;
-
-/// TODO
-pub type EthTxHash = String;
-
-/// TODO move somewhere else
-#[derive(Debug, Deserialize, Serialize)]
-pub struct GnosisSafeTransaction {
-    raw: Value,
-}
-
-impl GnosisSafeTransaction {
-    /// Decode a Gnosis Safe transaction.
-    pub fn decode(&self) -> Result<api_data_types::Transaction, Error> {
-        Ok(serde_json::from_value(self.raw.clone())?)
-    }
-
-    /// Get the transaction hash.
-    pub fn tx_hash(&self) -> Result<EthTxHash, Error> {
-        let hash_str = self
-            .raw
-            .get("transactionHash")
-            .or_else(|| self.raw.get("txHash"))
-            .and_then(|val| val.as_str())
-            .ok_or(Error::Other(
-                "GnosisSafeTransaction: missing transactionHash".to_string(),
-            ))?;
-        EthTxHash::from_str(hash_str)
-            .map_err(|err| Error::Other(format!("Failed parsing tx hash '{}': {}", hash_str, err)))
-    }
-
-    /// Serialize transaction into JSON.
-    pub fn to_json_string(&self) -> String {
-        self.raw.to_string()
-    }
-
-    /// Deserialize transaction from JSON.
-    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, Error> {
-        Ok(Self::from(serde_json::from_slice::<Value>(bytes)?))
-    }
-}
-
-impl From<Value> for GnosisSafeTransaction {
-    fn from(value: Value) -> Self {
-        Self { raw: value }
-    }
-}
 
 /// Gnosis Safe transaction fetcher, used to get the transaction data from a
 /// gnosis safe-transaction-service.
@@ -116,7 +67,7 @@ impl GnosisSafeFetcher {
     pub fn get_transaction_data(
         &self,
         safe_address: &EthAddr,
-    ) -> Result<Vec<GnosisSafeTransaction>, Error> {
+    ) -> Result<Vec<RawGnosisTransaction>, Error> {
         let url = self.base_url.join(&format!(
             "api/v1/safes/{}/all-transactions/?executed=true&queued=false&trusted=true",
             safe_address
@@ -143,7 +94,7 @@ impl GnosisSafeFetcher {
         Ok(data
             .results
             .into_iter()
-            .map(GnosisSafeTransaction::from)
+            .map(RawGnosisTransaction::from)
             .collect())
     }
 }

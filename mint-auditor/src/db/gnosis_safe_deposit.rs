@@ -24,7 +24,7 @@ impl GnosisSafeDepositModel for GnosisSafeDeposit {
         use super::schema::gnosis_safe_deposits::dsl;
 
         let obj = NewGnosisSafeDeposit {
-            eth_tx_hash: api_obj.tx_hash.clone(),
+            eth_tx_hash: api_obj.tx_hash.to_string(),
             safe_address: api_obj.to.to_string(),
             // Empty token address means ETH
             token_address: api_obj

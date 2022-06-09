@@ -9,8 +9,8 @@
 
 use super::{
     api_data_types::{EthereumTransaction, MultiSigTransaction, Transaction},
-    fetcher::{GnosisSafeFetcher, GnosisSafeTransaction},
-    AuditedSafeConfig,
+    fetcher::GnosisSafeFetcher,
+    AuditedSafeConfig, RawGnosisTransaction,
 };
 use crate::{
     db::{
@@ -64,7 +64,7 @@ impl GnosisSync {
     }
 
     /// Process transactions and insert them to the database.
-    pub fn process_transactions(&self, transactions: Vec<GnosisSafeTransaction>) {
+    pub fn process_transactions(&self, transactions: Vec<RawGnosisTransaction>) {
         for tx in transactions {
             let conn = self
                 .mint_auditor_db
@@ -308,7 +308,7 @@ impl GnosisSync {
 
         // Parsed everything we need.
         Ok(NewGnosisSafeWithdrawal {
-            eth_tx_hash: multi_sig_tx.tx_hash.clone(),
+            eth_tx_hash: multi_sig_tx.tx_hash.to_string(),
             safe_address: multi_sig_tx.safe.to_string(),
             token_address: transfer_data.to.to_string(),
             amount: transfer_value as i64,

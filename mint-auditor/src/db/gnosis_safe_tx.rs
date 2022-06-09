@@ -1,7 +1,8 @@
 // Copyright (c) 2018-2022 The MobileCoin Foundation
 
 use super::Conn;
-use crate::{error::Error, gnosis::fetcher};
+// TODO dont depend on gnosis stuff here?
+use crate::{error::Error, gnosis::RawGnosisTransaction};
 use diesel::prelude::*;
 
 pub use super::models::GnosisSafeTx;
@@ -10,15 +11,15 @@ pub use super::models::GnosisSafeTx;
 /// [GnosisSafeTx] model/table.
 pub trait GnosisSafeTxModel {
     /// TODO
-    fn insert(api_obj: &fetcher::GnosisSafeTransaction, conn: &Conn) -> Result<(), Error>;
+    fn insert(api_obj: &RawGnosisTransaction, conn: &Conn) -> Result<(), Error>;
 }
 
 impl GnosisSafeTxModel for GnosisSafeTx {
-    fn insert(api_obj: &fetcher::GnosisSafeTransaction, conn: &Conn) -> Result<(), Error> {
+    fn insert(api_obj: &RawGnosisTransaction, conn: &Conn) -> Result<(), Error> {
         use super::schema::gnosis_safe_txs::dsl;
 
         let obj = GnosisSafeTx {
-            eth_tx_hash: api_obj.tx_hash()?,
+            eth_tx_hash: api_obj.tx_hash()?.to_string(),
             raw_tx_json: api_obj.to_json_string(),
         };
 

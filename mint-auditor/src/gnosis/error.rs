@@ -29,6 +29,9 @@ pub enum Error {
     /// Invalid address: {0}
     InvalidAddress(String),
 
+    /// Invalid tx hash: {0}
+    InvalidTxHash(String),
+
     /// URL parse error: {0}
     UrlParse(ParseError),
 

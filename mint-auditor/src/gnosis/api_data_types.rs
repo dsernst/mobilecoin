@@ -3,10 +3,11 @@
 //! Structs for deserializing Gnosis API responses.
 //! See https://safe-transaction.gnosis.io/ for the API spec.
 
-use super::EthAddr;
+use super::{Error, EthAddr, EthTxHash};
 use mc_util_serial::JsonU64;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::str::FromStr;
 use url::Url;
 
 /// See `/safes/{address}/all-transactions/` at https://safe-transaction.gnosis.io/
@@ -86,7 +87,7 @@ pub struct MultiSigTransaction {
 
     /// Transaction hash
     #[serde(rename = "transactionHash")]
-    pub tx_hash: String,
+    pub tx_hash: EthTxHash,
 
     /// Decoded transaction data
     #[serde(rename = "dataDecoded")]
@@ -109,7 +110,7 @@ pub struct EthereumTransfer {
 
     /// Transaction hash
     #[serde(rename = "transactionHash")]
-    pub tx_hash: String,
+    pub tx_hash: EthTxHash,
 
     /// Transaction type
     #[serde(rename = "type")]
@@ -124,7 +125,7 @@ pub struct EthereumTransfer {
 pub struct EthereumTransaction {
     /// Transaction hash
     #[serde(rename = "txHash")]
-    pub tx_hash: String,
+    pub tx_hash: EthTxHash,
 
     /// Transfers
     pub transfers: Vec<EthereumTransfer>,
@@ -146,4 +147,47 @@ pub enum Transaction {
     /// Module transaction
     #[serde(rename = "MODULE_TRANSACTION")]
     Module(Value),
+}
+
+/// Raw (unparsed) transaction.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RawGnosisTransaction {
+    raw: Value,
+}
+
+impl RawGnosisTransaction {
+    /// Decode a Gnosis Safe transaction.
+    pub fn decode(&self) -> Result<Transaction, Error> {
+        Ok(serde_json::from_value(self.raw.clone())?)
+    }
+
+    /// Get the transaction hash.
+    pub fn tx_hash(&self) -> Result<EthTxHash, Error> {
+        let hash_str = self
+            .raw
+            .get("transactionHash")
+            .or_else(|| self.raw.get("txHash"))
+            .and_then(|val| val.as_str())
+            .ok_or(Error::Other(
+                "GnosisSafeTransaction: missing transactionHash".to_string(),
+            ))?;
+        EthTxHash::from_str(hash_str)
+            .map_err(|err| Error::Other(format!("Failed parsing tx hash '{}': {}", hash_str, err)))
+    }
+
+    /// Serialize transaction into JSON.
+    pub fn to_json_string(&self) -> String {
+        self.raw.to_string()
+    }
+
+    /// Deserialize transaction from JSON.
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, Error> {
+        Ok(Self::from(serde_json::from_slice::<Value>(bytes)?))
+    }
+}
+
+impl From<Value> for RawGnosisTransaction {
+    fn from(value: Value) -> Self {
+        Self { raw: value }
+    }
 }
