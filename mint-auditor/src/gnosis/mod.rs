@@ -2,6 +2,7 @@
 
 //! Gnosis safe auditing support.
 
+mod api_data_types;
 mod config;
 mod error;
 mod eth_data_types;
@@ -9,10 +10,8 @@ mod fetcher;
 mod sync;
 mod sync_thread;
 
-pub mod api_data_types; // TODO
-
 pub use self::{
-    api_data_types::RawGnosisTransaction,
+    api_data_types::{EthereumTransfer, MultiSigTransaction, RawGnosisTransaction},
     config::{AuditedSafeConfig, GnosisSafeConfig},
     error::Error,
     eth_data_types::{EthAddr, EthTxHash},

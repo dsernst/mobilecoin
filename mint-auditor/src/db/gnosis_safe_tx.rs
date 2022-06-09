@@ -1,7 +1,6 @@
 // Copyright (c) 2018-2022 The MobileCoin Foundation
 
 use super::Conn;
-// TODO dont depend on gnosis stuff here?
 use crate::{error::Error, gnosis::RawGnosisTransaction};
 use diesel::prelude::*;
 
@@ -10,7 +9,7 @@ pub use super::models::GnosisSafeTx;
 /// Trait for providing convenience functions for interacting with the
 /// [GnosisSafeTx] model/table.
 pub trait GnosisSafeTxModel {
-    /// TODO
+    /// Insert a raw Gnosis Safe transaction into the database.
     fn insert(api_obj: &RawGnosisTransaction, conn: &Conn) -> Result<(), Error>;
 }
 

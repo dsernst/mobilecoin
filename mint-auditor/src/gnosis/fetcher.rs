@@ -4,19 +4,7 @@
 //! gnosis safe-transaction-service.
 //!
 //! TODO
-//! - figure out what to return from get_all_transactions so that we capture
-//!   both the full response, and optionally the decoded transaction data
 //! - need to include offsets
-//! - need to store in lmdb: 1) map of real tx hash -> data (used to lookup from
-//!   mint nonce) 2) list of all hashes in chronological order? reverse
-//!   chronological order? lmdb ordering is messsy
-//! - code that takes a MintTx and returns the matching
-//!   DecodedGnosisSafeTransaction, this needs to: 1) lookup by the nonce 2)
-//!   compare the amount
-//! - code that takes DecodedGnosisSafeTransaction and if it contains a burn
-//!   (moving token out + burn memo multi-tx) try and locate matching mc
-//!   transaction (lookup by txout pub key)
-//!
 //! two scanning modes:
 //! 1) everything
 //! 2) until reaching a known hash

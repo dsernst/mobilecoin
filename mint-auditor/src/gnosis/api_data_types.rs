@@ -80,7 +80,7 @@ pub struct MultiSigTransaction {
     pub to: EthAddr,
 
     /// Value being transferred    
-    pub value: String, // TODO try JsonU64
+    pub value: JsonU64,
 
     /// Raw transaction data
     pub data: Option<String>,

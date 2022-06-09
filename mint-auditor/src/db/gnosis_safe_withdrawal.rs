@@ -9,7 +9,7 @@ pub use super::models::{GnosisSafeWithdrawal, NewGnosisSafeWithdrawal};
 /// Trait for providing convenience functions for interacting with the
 /// [GnosisSafeWithdrawal] model/table.
 pub trait GnosisSafeWithdrawalModel {
-    /// TODO
+    /// Insert a withdrawal into the database.
     fn insert(obj: &NewGnosisSafeWithdrawal, conn: &Conn) -> Result<(), Error>;
 }
 
