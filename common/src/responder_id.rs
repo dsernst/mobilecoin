@@ -58,3 +58,36 @@ impl AsRef<ResponderId> for ResponderId {
         self
     }
 }
+
+// Encode ResponderId as a proto string
+impl prost::Message for ResponderId {
+    fn encode_raw<B>(&self, buf: &mut B)
+    where
+        B: prost::bytes::BufMut,
+        Self: Sized,
+    {
+        String::encode_raw(&self.0, buf)
+    }
+
+    fn merge_field<B>(
+        &mut self,
+        tag: u32,
+        wire_type: prost::encoding::WireType,
+        buf: &mut B,
+        ctx: prost::encoding::DecodeContext,
+    ) -> Result<(), mc_util_serial::DecodeError>
+    where
+        B: prost::bytes::Buf,
+        Self: Sized,
+    {
+        String::merge_field(&mut self.0, tag, wire_type, buf, ctx)
+    }
+
+    fn encoded_len(&self) -> usize {
+        String::encoded_len(&self.0)
+    }
+
+    fn clear(&mut self) {
+        self.0.clear()
+    }
+}
