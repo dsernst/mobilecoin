@@ -41,6 +41,7 @@ pub struct AuditedSafeConfig {
 }
 
 impl AuditedSafeConfig {
+    /// Get an audited token by its Ethereum contract address.
     pub fn get_token_by_eth_contract_addr(
         &self,
         eth_contract_addr: &EthAddr,

@@ -15,6 +15,8 @@ use std::{
     time::Duration,
 };
 
+/// Background thread for periodically fetching data from the Gnosis API and
+/// inserting it into the database.
 pub struct GnosisSyncThread {
     stop_requested: Arc<AtomicBool>,
     join_handle: Option<JoinHandle<()>>,
@@ -22,6 +24,7 @@ pub struct GnosisSyncThread {
 }
 
 impl GnosisSyncThread {
+    /// Start the sync thread.
     pub fn start(
         audited_safe: &AuditedSafeConfig,
         mint_auditor_db: MintAuditorDb,
@@ -50,6 +53,8 @@ impl GnosisSyncThread {
             logger,
         })
     }
+
+    /// Stop the sync thread.
     pub fn stop(&mut self) {
         log::info!(self.logger, "Stopping gnosis sync thread...");
         self.stop_requested.store(true, Ordering::Relaxed);

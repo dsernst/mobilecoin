@@ -33,11 +33,12 @@ pub struct GnosisSync {
 }
 
 impl GnosisSync {
+    /// Instantiate a new [GnosisSync] object.
     pub fn new(
         audited_safe: AuditedSafeConfig,
         mint_auditor_db: MintAuditorDb,
         logger: Logger,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, GnosisError> {
         Ok(Self {
             fetcher: GnosisSafeFetcher::new(audited_safe.api_url.clone(), logger.clone())?,
             audited_safe,
@@ -45,6 +46,8 @@ impl GnosisSync {
             logger,
         })
     }
+
+    /// Poll the Gnosis API for transaction data.
     pub fn poll(&self) {
         // TODO handle pagination (offset, limit)
         match self
@@ -60,6 +63,7 @@ impl GnosisSync {
         }
     }
 
+    /// Process transactions and insert them to the database.
     pub fn process_transactions(&self, transactions: Vec<GnosisSafeTransaction>) {
         for tx in transactions {
             let conn = self

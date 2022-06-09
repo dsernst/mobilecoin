@@ -29,19 +29,22 @@ use serde_json::Value;
 use std::str::FromStr;
 use url::Url;
 
+/// TODO
 pub type EthTxHash = String;
 
-// TODO move somewhere else
+/// TODO move somewhere else
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GnosisSafeTransaction {
     raw: Value,
 }
 
 impl GnosisSafeTransaction {
+    /// Decode a Gnosis Safe transaction.
     pub fn decode(&self) -> Result<api_data_types::Transaction, Error> {
         Ok(serde_json::from_value(self.raw.clone())?)
     }
 
+    /// Get the transaction hash.
     pub fn tx_hash(&self) -> Result<EthTxHash, Error> {
         let hash_str = self
             .raw
@@ -55,10 +58,12 @@ impl GnosisSafeTransaction {
             .map_err(|err| Error::Other(format!("Failed parsing tx hash '{}': {}", hash_str, err)))
     }
 
+    /// Serialize transaction into JSON.
     pub fn to_json_string(&self) -> String {
         self.raw.to_string()
     }
 
+    /// Deserialize transaction from JSON.
     pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, Error> {
         Ok(Self::from(serde_json::from_slice::<Value>(bytes)?))
     }
