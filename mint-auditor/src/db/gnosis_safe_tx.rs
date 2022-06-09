@@ -1,7 +1,7 @@
 // Copyright (c) 2018-2022 The MobileCoin Foundation
 
 use super::Conn;
-use crate::{error::Error, gnosis::RawGnosisTransaction};
+use crate::{error::Error, gnosis::api_data_types::RawGnosisTransaction};
 use diesel::prelude::*;
 
 pub use super::models::GnosisSafeTx;

@@ -8,9 +8,9 @@
 //! Gnosis transactions that were already processed.
 
 use super::{
-    api_data_types::{EthereumTransaction, MultiSigTransaction, Transaction},
+    api_data_types::{EthereumTransaction, MultiSigTransaction, RawGnosisTransaction, Transaction},
     fetcher::GnosisSafeFetcher,
-    AuditedSafeConfig, RawGnosisTransaction,
+    AuditedSafeConfig,
 };
 use crate::{
     db::{

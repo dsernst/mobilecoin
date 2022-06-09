@@ -9,7 +9,10 @@
 //! 1) everything
 //! 2) until reaching a known hash
 
-use super::{api_data_types, error::Error, EthAddr, RawGnosisTransaction};
+use super::{
+    api_data_types::{AllTransactionsResponse, RawGnosisTransaction},
+    Error, EthAddr,
+};
 use mc_common::logger::{log, o, Logger};
 use reqwest::{blocking::Client, StatusCode};
 use url::Url;
@@ -76,7 +79,7 @@ impl GnosisSafeFetcher {
         }
 
         let data = response
-            .json::<api_data_types::AllTransactionsResponse>()
+            .json::<AllTransactionsResponse>()
             .map_err(|err| Error::Other(format!("Failed parsing JSON from '{}': {}", url, err)))?;
 
         Ok(data
