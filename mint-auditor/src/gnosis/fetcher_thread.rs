@@ -14,6 +14,7 @@ use crate::{
         NewGnosisSafeWithdrawal,
     },
     error::Error,
+    gnosis::Error as GnosisError,
 };
 use mc_common::logger::{log, Logger};
 use mc_ledger_db::LedgerDB;
@@ -224,182 +225,170 @@ impl FetcherThreadWorker {
         conn: &Conn,
         multi_sig_tx: &MultiSigTransaction,
     ) -> Result<(), Error> {
-        if let Some(withdrawal) = self.parse_withdrawal_with_pub_key_multi_sig_tx(multi_sig_tx) {
-            log::info!(
-                self.logger,
-                "Processing withdrawal from multi-sig tx: {:?}",
-                withdrawal
-            );
+        match self.parse_withdrawal_with_pub_key_multi_sig_tx(multi_sig_tx) {
+            Ok(withdrawal) => {
+                log::info!(
+                    self.logger,
+                    "Processing withdrawal from multi-sig tx: {:?}",
+                    withdrawal
+                );
 
-            GnosisSafeWithdrawal::insert(&withdrawal, conn)?;
-        }
+                GnosisSafeWithdrawal::insert(&withdrawal, conn)?;
+            }
+
+            Err(err) => {
+                log::warn!(
+                    self.logger,
+                    "Failed parsing a withdrawal from multisig tx {}: {}",
+                    multi_sig_tx.tx_hash,
+                    err
+                );
+            }
+        };
 
         Ok(())
     }
 
+    // See if this is a multi-sig withdrawal that uses the auxiliary contract for
+    // recording the tx out public key, and if so parse it into a
+    // [NewGnosisSafeWithdrawal] object.
     pub fn parse_withdrawal_with_pub_key_multi_sig_tx(
         &self,
         multi_sig_tx: &MultiSigTransaction,
-    ) -> Result<NewGnosisSafeWithdrawal, Error> {
-        // See if this is a multi-sig withdrawal that uses the auxiliary contract for
-        // recording the tx out public key.
-        let data = multi_sig_tx.data_decoded.as_ref().ok_or_else(|| GnosisError::ApiResultParse(format!(
-            "No data in multi-sig tx {}",
-            multi_sig_tx.tx_hash
-        )))?;
+    ) -> Result<NewGnosisSafeWithdrawal, GnosisError> {
+        // Get the decoded data - this is the part that contains details about the
+        // individual transfers included in the multi-transfer.
+        let data = multi_sig_tx
+            .data_decoded
+            .as_ref()
+            .ok_or_else(|| GnosisError::ApiResultParse("data_decoded is empty".into()))?;
 
         if data.method != "multiSend" {
-            log::info!(
-                self.logger,
-                "Skipping multi-sig tx {} with method {} (expected multiSend)",
-                multi_sig_tx.tx_hash,
+            return Err(GnosisError::ApiResultParse(format!(
+                "multi-sig tx method mismatch: got {}, expected multiSend",
                 data.method
-            );
-            return None;
+            )));
         }
 
+        // The decoded data is expected to contain a single "transactions" parameter,
+        // which should be an array of the individual transfers.
         if data.parameters.len() != 1 {
-            log::info!(
-                self.logger,
-                "Skipping multi-sig tx {} with {} parameters",
-                multi_sig_tx.tx_hash,
+            return Err(GnosisError::ApiResultParse(format!(
+                "invalid number of parameters: got {}, expected 1",
                 data.parameters.len()
-            );
-            return None;
+            )));
         }
 
         let parameter = &data.parameters[0];
-        let value_decoded = if let Some(val) = parameter.value_decoded.as_ref() {
-            val
-        } else {
-            log::info!(
-                self.logger,
-                "Skipping multi-sig tx {} with no value",
-                multi_sig_tx.tx_hash
-            );
-            return None;
-        };
+        let value_decoded = parameter.value_decoded.as_ref().ok_or_else(|| {
+            GnosisError::ApiResultParse("decoded data parameter is missing value_decoded".into())
+        })?;
 
+        // Each value contains a single transfer. We expect to have two trasnfers:
+        // 1) A transfer moving the token being withdrawn from the safe
+        // 2) A "dummy" transfer into the auxiliary contract, used to record the
+        // matching MobileCoin tx out public key of the matching burn.
         if value_decoded.len() != 2 {
-            log::info!(
-                self.logger,
-                "Skipping multi-sig tx {} with {} value parameters",
-                multi_sig_tx.tx_hash,
+            return Err(GnosisError::ApiResultParse(format!(
+                "Invalid number of values in multiSend transfer: got {}, expected 2",
                 value_decoded.len()
-            );
-            return None;
+            )));
         }
 
+        // The first value is the transfer of the actual token held in the safe. It
+        // should match a token we are auditing.
         let transfer_data = &value_decoded[0];
-        let audited_token = if let Some(audited_token) = self
+        let audited_token = self
             .audited_safe
             .get_token_by_eth_contract_addr(&transfer_data.to)
-        {
-            audited_token
-        } else {
-            log::info!(
-                self.logger,
-                "Skipping multi-sig tx {} with transfer to {}",
-                multi_sig_tx.tx_hash,
-                transfer_data.to
-            );
-            return None;
-        };
+            .ok_or_else(|| {
+                GnosisError::ApiResultParse(format!(
+                    "Encountered multiSend transaction to an unknown token: {}",
+                    transfer_data.to
+                ))
+            })?;
 
-        let transfer_data_decoded = if let Some(data) = transfer_data.data_decoded.as_ref() {
-            data
-        } else {
-            log::info!(
-                self.logger,
-                "Skipping multi-sig tx {} with no transfer data",
-                multi_sig_tx.tx_hash
-            );
-            return None;
-        };
+        // The first value (transfer of token held in safe) should contain two
+        // parameters - the ethereum address receiving the withdrawal and the
+        // amount being moved out of the safe.
+        let transfer_data_decoded = transfer_data.data_decoded.as_ref().ok_or_else(|| {
+            GnosisError::ApiResultParse("multiSend transfer first value has no decided data".into())
+        })?;
         if transfer_data_decoded.method != "transfer" {
-            log::info!(
-                self.logger,
-                "Skipping multi-sig tx {} with transfer method {}",
-                multi_sig_tx.tx_hash,
+            return Err(GnosisError::ApiResultParse(format!(
+                "Invalid first value method: got {}, expected transfer",
                 transfer_data_decoded.method
-            );
-            return None;
+            )));
         }
-        let value_str = if let Some(val) =
-            transfer_data_decoded.parameters.iter().find_map(|param| {
+
+        let value_str = transfer_data_decoded
+            .parameters
+            .iter()
+            .find_map(|param| {
                 if param.name == "value" {
                     Some(&param.value)
                 } else {
                     None
                 }
-            }) {
-            val
-        } else {
-            log::info!(
-                self.logger,
-                "Skipping multi-sig tx {} with no value parameter",
-                multi_sig_tx.tx_hash
-            );
-            return None;
-        };
-        let transfer_value = if let Ok(val) = value_str.parse::<u64>() {
-            val
-        } else {
-            log::info!(
-                self.logger,
-                "Skipping multi-sig tx {} with invalid value {}",
-                multi_sig_tx.tx_hash,
-                value_str
-            );
-            return None;
-        };
+            })
+            .ok_or_else(|| {
+                GnosisError::ApiResultParse("first value is missing the \"value\" parameter".into())
+            })?;
+        let transfer_value = value_str.parse::<u64>().map_err(|err| {
+            GnosisError::ApiResultParse(format!(
+                "invalid first value parameter: \"value\" {} cannot be be converted to u64: {}",
+                value_str, err,
+            ))
+        })?;
 
+        // The second value (dummy transfer to auxiliary contract) shoulld contain the
+        // MobileCoin tx out public key in the data. There is no decoded version
+        // of the data since the Gnosis API does not how to decode custom contracts.
         let aux_contract_value = &value_decoded[1];
         if aux_contract_value.to != audited_token.aux_burn_contract_addr {
-            log::info!(
-                self.logger,
-                "Skipping multi-sig tx {} with aux contract to {}",
-                multi_sig_tx.tx_hash,
-                aux_contract_value.to
-            );
-            return None;
+            return Err(GnosisError::ApiResultParse(format!(
+                "aux contract destination mismatch: got {}, expected {}",
+                aux_contract_value.to, audited_token.aux_burn_contract_addr
+            )));
         }
 
         if !aux_contract_value.data.starts_with("0x") {
-            log::info!(
-                self.logger,
-                "Skipping multi-sig tx {} with invalid aux contract value {}",
-                multi_sig_tx.tx_hash,
+            return Err(GnosisError::ApiResultParse(format!(
+                "aux contract data doesn't start with 0x: got {}",
                 aux_contract_value.data,
-            );
-            return None;
-        }
-        let aux_data_bytes = if let Ok(bytes) = hex::decode(&aux_contract_value.data[2..]) {
-            bytes
-        } else {
-            log::info!(
-                self.logger,
-                "Skipping multi-sig tx {} with invalid aux data {}",
-                multi_sig_tx.tx_hash,
-                aux_contract_value.data,
-            );
-            return None;
-        };
-
-        if aux_data_bytes.len() != 100 || !aux_data_bytes.starts_with(b"\xc7\x6f\x06\x35") {
-            log::info!(
-                self.logger,
-                "Skipping multi-sig tx {} with invalid aux data {}",
-                multi_sig_tx.tx_hash,
-                aux_contract_value.data,
-            );
-            return None;
+            )));
         }
 
-        // The tx out pub key is the last 32 bytes.
+        let aux_data_bytes = hex::decode(&aux_contract_value.data[2..]).map_err(|err| {
+            GnosisError::ApiResultParse(format!(
+                "aux contract data {} cannot be hex-decoded: {}",
+                aux_contract_value.data, err,
+            ))
+        })?;
+
+        if !aux_data_bytes.starts_with(&audited_token.aux_burn_function_sig) {
+            return Err(GnosisError::ApiResultParse(format!(
+                "aux contract data {} does not start with the expected function signature",
+                aux_contract_value.data,
+            )));
+        }
+
+        // The tx out pub key is the last 32 bytes. Ensure we have enough bytes in the
+        // data for that.
+        let min_length = audited_token.aux_burn_function_sig.len() + 32;
+        if aux_data_bytes.len() < min_length {
+            return Err(GnosisError::ApiResultParse(format!(
+                "aux contract data {} does not contain enough bytes. got {}, expected at least {}",
+                aux_contract_value.data,
+                aux_contract_value.data.len(),
+                min_length,
+            )));
+        }
+
         let tx_out_pub_key = &aux_data_bytes[aux_data_bytes.len() - 32..];
 
-        Some(NewGnosisSafeWithdrawal {
+        // Parsed everything we need.
+        Ok(NewGnosisSafeWithdrawal {
             eth_tx_hash: multi_sig_tx.tx_hash.clone(),
             safe_address: multi_sig_tx.safe.to_string(),
             token_address: transfer_data.to.to_string(),

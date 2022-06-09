@@ -2,9 +2,9 @@
 
 //! TODO
 
+use super::EthAddr;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use super::EthAddr;
 
 // Represents u64 using string, when serializing to Json
 // Javascript integers are not 64 bit, and so it is not really proper json.
