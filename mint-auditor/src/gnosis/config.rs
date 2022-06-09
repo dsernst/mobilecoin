@@ -40,6 +40,12 @@ pub struct AuditedSafeConfig {
     pub tokens: Vec<AuditedToken>,
 }
 
+impl AuditedSafeConfig {
+    pub fn get_token_by_eth_contract_addr(&self, eth_contract_addr: &EthAddr) -> Option<&AuditedToken> {
+        self.tokens.iter().find(|token| token.eth_token_contract_addr == *eth_contract_addr)
+    }
+}
+
 /// Configuration for Gnosis safe(s) auditing.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct GnosisSafeConfig {

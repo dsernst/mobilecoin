@@ -32,6 +32,9 @@ pub enum Error {
     /// URL parse error: {0}
     UrlParse(ParseError),
 
+    /// Api result parse error: {0}
+    ApiResultParse(String),
+
     /// Other: {0}
     Other(String),
 }

@@ -5,7 +5,7 @@
 use super::{
     api_data_types::{EthereumTransaction, MultiSigTransaction, Transaction},
     fetcher::{GnosisSafeFetcher, GnosisSafeTransaction},
-    EthAddr,
+    AuditedSafeConfig, EthAddr,
 };
 use crate::{
     db::{
@@ -16,9 +16,9 @@ use crate::{
     error::Error,
 };
 use mc_common::logger::{log, Logger};
-use std::str::FromStr;
 use mc_ledger_db::LedgerDB;
 use std::{
+    str::FromStr,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -26,11 +26,6 @@ use std::{
     thread::{sleep, spawn, JoinHandle},
     time::Duration,
 };
-use url::Url;
-
-// TODO make these configurable, support multiple ones
-const TOKEN1_CONTRACT_ADDRESS: &str = "0xD92E713d051C37EbB2561803a3b5FBAbc4962431"; // TUSDT
-const MOBILECOIN_AUX_CONTRACT_ADDRESS: &str = "0x76BD419fBa96583d968b422D4f3CB2A70bf4CF40"; // The test contract that holds the public key
 
 pub struct FetcherThread {
     stop_requested: Arc<AtomicBool>,
@@ -40,27 +35,25 @@ pub struct FetcherThread {
 
 impl FetcherThread {
     pub fn start(
-        safe_addr: EthAddr,
+        audited_safe: &AuditedSafeConfig,
         mint_auditor_db: MintAuditorDb,
         ledger_db: LedgerDB,
         poll_interval: Duration,
-        gnosis_api_url: Url,
         logger: Logger,
     ) -> Result<Self, Error> {
-        let fetcher = GnosisSafeFetcher::new(gnosis_api_url, logger.clone())?;
         let stop_requested = Arc::new(AtomicBool::new(false));
 
         let thread_stop_requested = stop_requested.clone();
         let thread_logger = logger.clone();
+        let thread_audited_safe = audited_safe.clone();
 
         let join_handle = Some(spawn(move || {
             thread_entry_point(
                 thread_stop_requested,
-                safe_addr,
+                thread_audited_safe,
                 mint_auditor_db,
                 ledger_db,
                 poll_interval,
-                fetcher,
                 thread_logger,
             )
         }));
@@ -90,19 +83,15 @@ impl Drop for FetcherThread {
 
 fn thread_entry_point(
     stop_requested: Arc<AtomicBool>,
-    safe_addr: EthAddr,
+    audited_safe: AuditedSafeConfig,
     mint_auditor_db: MintAuditorDb,
     _ledger_db: LedgerDB,
     poll_interval: Duration,
-    fetcher: GnosisSafeFetcher,
     logger: Logger,
 ) {
     log::info!(logger, "GnosisFetcher thread started");
-    let worker = FetcherThreadWorker {
-        safe_addr: safe_addr.clone(),
-        mint_auditor_db,
-        logger: logger.clone(),
-    };
+    let worker = FetcherThreadWorker::new(audited_safe, mint_auditor_db, logger.clone())
+        .expect("Failed creating worker");
 
     loop {
         if stop_requested.load(Ordering::Relaxed) {
@@ -110,27 +99,46 @@ fn thread_entry_point(
             break;
         }
 
-        // TODO handle pagination (offset, limit)
-        match fetcher.get_transaction_data(&safe_addr) {
-            Ok(transactions) => {
-                worker.process_transactions(transactions);
-            }
-            Err(err) => {
-                log::error!(logger, "Failed to fetch Gnosis transactions: {}", err);
-            }
-        }
-
+        worker.poll();
         sleep(poll_interval);
     }
 }
 
 struct FetcherThreadWorker {
-    safe_addr: EthAddr,
+    fetcher: GnosisSafeFetcher,
+    audited_safe: AuditedSafeConfig,
     mint_auditor_db: MintAuditorDb,
     logger: Logger,
 }
 
 impl FetcherThreadWorker {
+    pub fn new(
+        audited_safe: AuditedSafeConfig,
+        mint_auditor_db: MintAuditorDb,
+        logger: Logger,
+    ) -> Result<Self, Error> {
+        Ok(Self {
+            fetcher: GnosisSafeFetcher::new(audited_safe.api_url.clone(), logger.clone())?,
+            audited_safe,
+            mint_auditor_db,
+            logger,
+        })
+    }
+    pub fn poll(&self) {
+        // TODO handle pagination (offset, limit)
+        match self
+            .fetcher
+            .get_transaction_data(&self.audited_safe.safe_addr)
+        {
+            Ok(transactions) => {
+                self.process_transactions(transactions);
+            }
+            Err(err) => {
+                log::error!(self.logger, "Failed to fetch Gnosis transactions: {}", err);
+            }
+        }
+    }
+
     pub fn process_transactions(&self, transactions: Vec<GnosisSafeTransaction>) {
         for tx in transactions {
             let conn = self
@@ -181,7 +189,7 @@ impl FetcherThreadWorker {
 
         for transfer in &tx.transfers {
             // See if this is a deposit to the safe.
-            if EthAddr::from_str(&transfer.to)? == self.safe_addr {
+            if transfer.to == self.audited_safe.safe_addr {
                 log::info!(
                     self.logger,
                     "Processing gnosis safe deposit: {:?}",
@@ -232,15 +240,18 @@ impl FetcherThreadWorker {
     pub fn parse_withdrawal_with_pub_key_multi_sig_tx(
         &self,
         multi_sig_tx: &MultiSigTransaction,
-    ) -> Option<NewGnosisSafeWithdrawal> {
+    ) -> Result<NewGnosisSafeWithdrawal, Error> {
         // See if this is a multi-sig withdrawal that uses the auxiliary contract for
         // recording the tx out public key.
-        let data = multi_sig_tx.data_decoded.as_ref()?;
+        let data = multi_sig_tx.data_decoded.as_ref().ok_or_else(|| GnosisError::ApiResultParse(format!(
+            "No data in multi-sig tx {}",
+            multi_sig_tx.tx_hash
+        )))?;
 
         if data.method != "multiSend" {
             log::info!(
                 self.logger,
-                "Skipping multi-sig tx {} with method {}",
+                "Skipping multi-sig tx {} with method {} (expected multiSend)",
                 multi_sig_tx.tx_hash,
                 data.method
             );
@@ -280,7 +291,12 @@ impl FetcherThreadWorker {
         }
 
         let transfer_data = &value_decoded[0];
-        if transfer_data.to != TOKEN1_CONTRACT_ADDRESS {
+        let audited_token = if let Some(audited_token) = self
+            .audited_safe
+            .get_token_by_eth_contract_addr(&transfer_data.to)
+        {
+            audited_token
+        } else {
             log::info!(
                 self.logger,
                 "Skipping multi-sig tx {} with transfer to {}",
@@ -288,7 +304,8 @@ impl FetcherThreadWorker {
                 transfer_data.to
             );
             return None;
-        }
+        };
+
         let transfer_data_decoded = if let Some(data) = transfer_data.data_decoded.as_ref() {
             data
         } else {
@@ -338,7 +355,7 @@ impl FetcherThreadWorker {
         };
 
         let aux_contract_value = &value_decoded[1];
-        if aux_contract_value.to != MOBILECOIN_AUX_CONTRACT_ADDRESS {
+        if aux_contract_value.to != audited_token.aux_burn_contract_addr {
             log::info!(
                 self.logger,
                 "Skipping multi-sig tx {} with aux contract to {}",
@@ -384,8 +401,8 @@ impl FetcherThreadWorker {
 
         Some(NewGnosisSafeWithdrawal {
             eth_tx_hash: multi_sig_tx.tx_hash.clone(),
-            safe_address: multi_sig_tx.safe.clone(),
-            token_address: transfer_data.to.clone(),
+            safe_address: multi_sig_tx.safe.to_string(),
+            token_address: transfer_data.to.to_string(),
             amount: transfer_value as i64,
             mobilecoin_tx_out_public_key_hex: hex::encode(tx_out_pub_key),
         })

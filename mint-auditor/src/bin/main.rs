@@ -187,11 +187,10 @@ fn cmd_scan_ledger(
             .iter()
             .map(|safe_config| {
                 FetcherThread::start(
-                    safe_config.safe_addr.clone(), // TODO
+                    safe_config,
                     mint_auditor_db.clone(),
                     ledger_db.clone(),
                     poll_interval,
-                    safe_config.api_url.clone(),
                     logger.clone(),
                 )
                 .expect("Failed starting gnosis safe fetcher thread")

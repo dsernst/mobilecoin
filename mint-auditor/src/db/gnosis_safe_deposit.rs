@@ -25,8 +25,8 @@ impl GnosisSafeDepositModel for GnosisSafeDeposit {
 
         let obj = NewGnosisSafeDeposit {
             eth_tx_hash: api_obj.tx_hash.clone(),
-            safe_address: api_obj.to.clone(),
-            token_address: api_obj.token_address.clone().unwrap_or_default(),
+            safe_address: api_obj.to.to_string(),
+            token_address: api_obj.token_address.clone().unwrap_or_default().to_string(),
             amount: u64::from(api_obj.value) as i64,
         };
 

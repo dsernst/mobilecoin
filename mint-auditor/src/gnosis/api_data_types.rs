@@ -4,6 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use super::EthAddr;
 
 // Represents u64 using string, when serializing to Json
 // Javascript integers are not 64 bit, and so it is not really proper json.
@@ -61,7 +62,7 @@ pub struct DataDecodedParameter {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ValueDecoded {
     pub operation: u64,
-    pub to: String,
+    pub to: EthAddr,
     pub value: String,
     pub data: String,
 
@@ -71,8 +72,8 @@ pub struct ValueDecoded {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MultiSigTransaction {
-    pub safe: String,
-    pub to: String,
+    pub safe: EthAddr,
+    pub to: EthAddr,
     pub value: String,
     pub data: Option<String>,
     #[serde(rename = "transactionHash")]
@@ -84,12 +85,12 @@ pub struct MultiSigTransaction {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EthereumTransfer {
-    pub from: String,
-    pub to: String,
+    pub from: EthAddr,
+    pub to: EthAddr,
 
     /// None for Eth transfers
     #[serde(rename = "tokenAddress")]
-    pub token_address: Option<String>,
+    pub token_address: Option<EthAddr>,
 
     #[serde(rename = "transactionHash")]
     pub tx_hash: String,

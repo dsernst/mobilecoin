@@ -21,8 +21,7 @@
 //! 1) everything
 //! 2) until reaching a known hash
 
-use super::{api_data_types, error::Error};
-use super::EthAddr;
+use super::{api_data_types, error::Error, EthAddr};
 use mc_common::logger::{log, o, Logger};
 use reqwest::{blocking::Client, StatusCode};
 use serde::{Deserialize, Serialize};
